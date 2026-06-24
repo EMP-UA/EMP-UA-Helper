@@ -427,3 +427,15 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# UA: Реальні налаштування з API ключами — не комітити
+# EN: Real settings with API keys — do not commit
+**/appsettings.json
+
+# UA: Персональні шаблони повідомлень — не комітити
+# EN: Personal message templates — do not commit
+**/templates.json
+
+# UA: Логи програми — не комітити
+# EN: Application logs — do not commit
+**/logs/

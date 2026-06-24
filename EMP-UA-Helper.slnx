@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="EMP.UAHelper.Core/EMP.UAHelper.Core.csproj" />
+  <Project Path="EMP.UAHelper.WPF/EMP.UAHelper.WPF.csproj" />
+</Solution>

@@ -1,0 +1,243 @@
+﻿<!-- Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper -->
+<!-- Donate: https://ko-fi.com/emp_ua -->
+<!-- UA: Вікно редагування шаблонів повідомлень
+     EN: Message template editor window -->
+<Window x:Class="EMP.UAHelper.WPF.TemplateEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Height="820" Width="1100"
+        MinHeight="650" MinWidth="800"
+        WindowStartupLocation="CenterScreen"
+        Background="#0D0A14">
+
+    <Window.Resources>
+        <Style TargetType="TabItem">
+            <Setter Property="Background" Value="#1A1425"/>
+            <Setter Property="Foreground" Value="#B8A8D0"/>
+            <Setter Property="BorderBrush" Value="#3D2B5E"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#3D2B5E"/>
+                    <Setter Property="Foreground" Value="#C989F3"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="#C989F3"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#C989F3"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,18,0,6"/>
+        </Style>
+
+        <Style x:Key="SubLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#B8A8D0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="0,8,0,3"/>
+        </Style>
+
+        <Style x:Key="TemplateBox" TargetType="TextBox">
+            <Setter Property="Background" Value="#1A1425"/>
+            <Setter Property="Foreground" Value="#E8E0F0"/>
+            <Setter Property="BorderBrush" Value="#3D2B5E"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="SelectionBrush" Value="#8A46C1"/>
+        </Style>
+
+        <Style x:Key="TitleBox" TargetType="TextBox"
+               BasedOn="{StaticResource TemplateBox}">
+            <Setter Property="MinHeight" Value="44"/>
+        </Style>
+
+        <Style x:Key="BodyBox" TargetType="TextBox"
+               BasedOn="{StaticResource TemplateBox}">
+            <Setter Property="MinHeight" Value="80"/>
+        </Style>
+
+        <Style x:Key="EmpButton" TargetType="Button">
+            <Setter Property="Background" Value="#8A46C1"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#C989F3"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LangButton" TargetType="Button">
+            <Setter Property="Background" Value="#1A1425"/>
+            <Setter Property="Foreground" Value="#C989F3"/>
+            <Setter Property="BorderBrush" Value="#8A46C1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3D2B5E"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#B8A8D0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,4,0,8"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- UA: Заголовок, підказка і перемикач мови
+             EN: Header, hint and language switcher -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+                <TextBlock x:Name="TxtHeader"
+                           Foreground="#C989F3" FontSize="20" FontWeight="Bold"/>
+                <TextBlock x:Name="TxtHint"
+                           Style="{StaticResource HintText}"
+                           Margin="0,6,0,0"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                        VerticalAlignment="Top" Margin="8,0,0,0">
+                <Button x:Name="BtnUA" Content="🇺🇦 UA"
+                        Style="{StaticResource LangButton}"
+                        Margin="0,0,4,0"
+                        Click="BtnUA_Click"/>
+                <Button x:Name="BtnEN" Content="🇬🇧 EN"
+                        Style="{StaticResource LangButton}"
+                        Click="BtnEN_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- UA: Вкладки платформ / EN: Platform tabs -->
+        <TabControl x:Name="TabMain"
+                    Grid.Row="1"
+                    Background="#0D0A14"
+                    BorderBrush="#3D2B5E"
+                    Foreground="#E8E0F0">
+
+            <!-- UA: Вкладка Telegram / EN: Telegram tab -->
+            <TabItem x:Name="TabTelegram">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4">
+                    <StackPanel Margin="8">
+
+                        <TextBlock x:Name="TxtTgLive"
+                                   Style="{StaticResource SectionHeader}"/>
+                        <TextBox x:Name="TgLive"
+                                 Style="{StaticResource BodyBox}"/>
+
+                        <TextBlock x:Name="TxtTgUpcoming"
+                                   Style="{StaticResource SectionHeader}"/>
+                        <TextBox x:Name="TgUpcoming"
+                                 Style="{StaticResource BodyBox}"/>
+
+                        <TextBlock x:Name="TxtTgVideo"
+                                   Style="{StaticResource SectionHeader}"/>
+                        <TextBox x:Name="TgVideo"
+                                 Style="{StaticResource BodyBox}"/>
+
+                        <TextBlock x:Name="TxtTgShort"
+                                   Style="{StaticResource SectionHeader}"/>
+                        <TextBox x:Name="TgShort"
+                                 Style="{StaticResource BodyBox}"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- UA: Вкладка Discord / EN: Discord tab -->
+            <TabItem x:Name="TabDiscord">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4">
+                    <StackPanel Margin="8">
+
+                        <TextBlock x:Name="TxtDcLive"
+                                   Style="{StaticResource SectionHeader}"/>
+                        <TextBlock x:Name="TxtDcLiveTitleLabel"
+                                   Style="{StaticResource SubLabel}"/>
+                        <TextBox x:Name="DcTitleLive"
+                                 Style="{StaticResource TitleBox}"/>
+                        <TextBlock x:Name="TxtDcLiveBodyLabel"
+                                   Style="{StaticResource SubLabel}"/>
+                        <TextBox x:Name="DcLive"
+                                 Style="{StaticResource BodyBox}"/>
+
+                        <TextBlock x:Name="TxtDcUpcoming"
+                                   Style="{StaticResource SectionHeader}"/>
+                        <TextBlock x:Name="TxtDcUpcomingTitleLabel"
+                                   Style="{StaticResource SubLabel}"/>
+                        <TextBox x:Name="DcTitleUpcoming"
+                                 Style="{StaticResource TitleBox}"/>
+                        <TextBlock x:Name="TxtDcUpcomingBodyLabel"
+                                   Style="{StaticResource SubLabel}"/>
+                        <TextBox x:Name="DcUpcoming"
+                                 Style="{StaticResource BodyBox}"/>
+
+                        <TextBlock x:Name="TxtDcVideo"
+                                   Style="{StaticResource SectionHeader}"/>
+                        <TextBlock x:Name="TxtDcVideoTitleLabel"
+                                   Style="{StaticResource SubLabel}"/>
+                        <TextBox x:Name="DcTitleVideo"
+                                 Style="{StaticResource TitleBox}"/>
+                        <TextBlock x:Name="TxtDcVideoBodyLabel"
+                                   Style="{StaticResource SubLabel}"/>
+                        <TextBox x:Name="DcVideo"
+                                 Style="{StaticResource BodyBox}"/>
+
+                        <TextBlock x:Name="TxtDcShort"
+                                   Style="{StaticResource SectionHeader}"/>
+                        <TextBlock x:Name="TxtDcShortTitleLabel"
+                                   Style="{StaticResource SubLabel}"/>
+                        <TextBox x:Name="DcTitleShort"
+                                 Style="{StaticResource TitleBox}"/>
+                        <TextBlock x:Name="TxtDcShortBodyLabel"
+                                   Style="{StaticResource SubLabel}"/>
+                        <TextBox x:Name="DcShort"
+                                 Style="{StaticResource BodyBox}"/>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- UA: Кнопки дій / EN: Action buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button x:Name="BtnReset"
+                    Style="{StaticResource EmpButton}"
+                    Background="#3D2B5E" Margin="0,0,8,0"
+                    Click="BtnReset_Click"/>
+            <Button x:Name="BtnSave"
+                    Style="{StaticResource EmpButton}"
+                    Click="BtnSave_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

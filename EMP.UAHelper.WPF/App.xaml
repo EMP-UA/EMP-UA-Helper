@@ -1,0 +1,9 @@
+﻿<!-- UA: Точка входу WPF — без головного вікна, тільки трей
+     EN: WPF entry point — no main window, tray only -->
+<Application x:Class="EMP.UAHelper.WPF.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+    </Application.Resources>
+</Application>
