@@ -90,7 +90,7 @@ namespace EMP.UAHelper.Core.Services
             // UA: Редактор шаблонів / EN: Template editor
             ["templates.title"] = "EMP UA Helper — Редактор шаблонів",
             ["templates.header"] = "Редактор шаблонів повідомлень",
-            ["templates.hint"] = "Доступні змінні: {title} — назва відео    {url} — посилання YouTube    {twitch} — посилання Twitch",
+            ["templates.hint"] = "Змінні: {title} — назва    {url} — YouTube    {twitch} — Twitch    {scheduled_telegram} — дата/час (Telegram, Upcoming)    {scheduled_discord} — Unix час (Discord, Upcoming)",
             ["templates.tab.telegram"] = "Telegram",
             ["templates.tab.discord"] = "Discord",
             ["templates.discord.title_label"] = "Заголовок",
@@ -167,7 +167,7 @@ namespace EMP.UAHelper.Core.Services
             // Template editor
             ["templates.title"] = "EMP UA Helper — Template Editor",
             ["templates.header"] = "Message Template Editor",
-            ["templates.hint"] = "Available variables: {title} — video title    {url} — YouTube link    {twitch} — Twitch link",
+            ["templates.hint"] = "Variables: {title} — title    {url} — YouTube    {twitch} — Twitch    {scheduled_telegram} — date/time (Telegram, Upcoming)    {scheduled_discord} — Unix time (Discord, Upcoming)",
             ["templates.tab.telegram"] = "Telegram",
             ["templates.tab.discord"] = "Discord",
             ["templates.discord.title_label"] = "Title",

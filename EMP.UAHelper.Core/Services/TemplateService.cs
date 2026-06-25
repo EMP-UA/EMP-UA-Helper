@@ -17,6 +17,7 @@ namespace EMP.UAHelper.Core.Services
         public const string VarTitle = "{title}";
         public const string VarUrl = "{url}";
         public const string VarTwitch = "{twitch}";
+        public const string VarScheduled = "{scheduled}";
 
         public TemplateService()
         {
@@ -33,18 +34,38 @@ namespace EMP.UAHelper.Core.Services
         public async Task SaveAsync(MessageTemplates templates)
         {
             _templates = templates;
-            var json = JsonSerializer.Serialize(templates, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(templates,
+                new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(_templatesPath, json);
         }
 
         // UA: Застосувати змінні до шаблону
         // EN: Apply variables to template
-        public string Apply(string template, string title, string url, string twitchUrl)
+        public string Apply(string template, string title, string url,
+            string twitchUrl, long? scheduledTime = null)
         {
+            // UA: Для Discord використовуємо Unix timestamp напряму
+            // EN: For Discord we use Unix timestamp directly
+            var scheduledDiscord = scheduledTime.HasValue
+                ? scheduledTime.Value.ToString()
+                : string.Empty;
+
+            // UA: Для Telegram конвертуємо в читабельний формат дати
+            // EN: For Telegram convert to human-readable date format
+            var scheduledTelegram = scheduledTime.HasValue
+                ? DateTimeOffset.FromUnixTimeSeconds(scheduledTime.Value)
+                    .ToOffset(TimeSpan.FromHours(3))
+                    .ToString("d MMMM о HH:mm (UTC+3)",
+                        new System.Globalization.CultureInfo("uk-UA"))
+                : string.Empty;
+
             return template
                 .Replace(VarTitle, title)
                 .Replace(VarUrl, url)
-                .Replace(VarTwitch, twitchUrl);
+                .Replace(VarTwitch, twitchUrl)
+                .Replace("{scheduled_discord}", scheduledDiscord)
+                .Replace("{scheduled_telegram}", scheduledTelegram)
+                .Replace(VarScheduled, scheduledDiscord);
         }
 
         // UA: Завантажити шаблони з файлу або створити дефолтні
@@ -59,7 +80,8 @@ namespace EMP.UAHelper.Core.Services
 
             var defaults = CreateDefault();
             File.WriteAllText(_templatesPath,
-                JsonSerializer.Serialize(defaults, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(defaults,
+                    new JsonSerializerOptions { WriteIndented = true }));
             return defaults;
         }
 
@@ -77,7 +99,8 @@ namespace EMP.UAHelper.Core.Services
                     "#EMP_трансляції",
                 Upcoming =
                     "🔔 <b>Імпульс готується до передачі. Очікуйте сигналу.</b>\n" +
-                    "📥 <b>Ціль:</b> {title}\n\n" +
+                    "📥 <b>Ціль:</b> {title}\n" +
+                    "🗓 <b>Початок:</b> {scheduled_telegram}\n\n" +
                     "🔴 <a href=\"{url}\">YouTube</a>\n" +
                     "🟣 <a href=\"{twitch}\">Twitch</a>\n\n" +
                     "#EMP_трансляції",
@@ -93,13 +116,18 @@ namespace EMP.UAHelper.Core.Services
             Discord = new PlatformTemplates
             {
                 Live =
-                    "📥 **Розшифровка:** {title}\n\n🔴 [YouTube]({url})\n🟣 [Twitch]({twitch})",
+                    "📥 **Розшифровка:** {title}\n\n" +
+                    "🔴 [YouTube]({url})\n🟣 [Twitch]({twitch})",
                 Upcoming =
-                    "📥 **Ціль:** {title}\n\n🔴 [YouTube]({url})\n🟣 [Twitch]({twitch})",
+                    "📥 **Ціль:** {title}\n" +
+                    "🗓️ **Початок:** <t:{scheduled_discord}:F> (<t:{scheduled_discord}:R>)\n\n" +
+                    "🔴 [YouTube]({url})\n🟣 [Twitch]({twitch})",
                 Video =
-                    "📥 **Файл:** {title}\n\n🔴 [Завантажити візуалізацію]({url})",
+                    "📥 **Файл:** {title}\n\n" +
+                    "🔴 [Завантажити візуалізацію]({url})",
                 Short =
-                    "📱 {title}\n\n🔴 [Прийняти сигнал]({url})"
+                    "📱 {title}\n\n" +
+                    "🔴 [Прийняти сигнал]({url})"
             },
             DiscordTitles = new PlatformTemplates
             {

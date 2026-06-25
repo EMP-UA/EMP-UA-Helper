@@ -54,8 +54,21 @@ namespace EMP.UAHelper.Core.Services
                 _ => throw new ArgumentOutOfRangeException()
             };
 
-            var embedTitle = _templateService.Apply(titleTemplate, video.Title, video.Url, _twitchUrl);
-            var description = _templateService.Apply(bodyTemplate, video.Title, video.Url, _twitchUrl);
+            // UA: Передаємо ScheduledStartTime для підстановки Unix timestamp у шаблон
+            // EN: Pass ScheduledStartTime for Unix timestamp substitution in template
+            var embedTitle = _templateService.Apply(
+                titleTemplate,
+                video.Title,
+                video.Url,
+                _twitchUrl,
+                video.ScheduledStartTime);
+
+            var description = _templateService.Apply(
+                bodyTemplate,
+                video.Title,
+                video.Url,
+                _twitchUrl,
+                video.ScheduledStartTime);
 
             var payload = new
             {

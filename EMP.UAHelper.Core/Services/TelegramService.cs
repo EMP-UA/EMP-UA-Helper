@@ -41,7 +41,14 @@ namespace EMP.UAHelper.Core.Services
                 _ => throw new ArgumentOutOfRangeException()
             };
 
-            var text = _templateService.Apply(template, video.Title, video.Url, _twitchUrl);
+            // UA: Передаємо ScheduledStartTime для підстановки дати у шаблон
+            // EN: Pass ScheduledStartTime for date substitution in template
+            var text = _templateService.Apply(
+                template,
+                video.Title,
+                video.Url,
+                _twitchUrl,
+                video.ScheduledStartTime);
 
             await _botClient.SendMessage(
                 chatId: _channelUsername,

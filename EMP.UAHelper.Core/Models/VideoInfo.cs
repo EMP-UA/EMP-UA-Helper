@@ -39,6 +39,10 @@ namespace EMP.UAHelper.Core.Models
         // EN: Content type
         public VideoType Type { get; set; }
 
+        // UA: Запланований час початку трансляції (Unix timestamp для Discord)
+        // EN: Scheduled stream start time (Unix timestamp for Discord)
+        public long? ScheduledStartTime { get; set; }
+
         // UA: Пряме посилання на відео
         // EN: Direct link to the video
         public string Url => $"https://www.youtube.com/watch?v={VideoId}";

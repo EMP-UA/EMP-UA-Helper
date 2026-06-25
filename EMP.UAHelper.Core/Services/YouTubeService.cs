@@ -33,8 +33,8 @@ namespace EMP.UAHelper.Core.Services
                 ApiKey = _apiKey
             });
 
-            // UA: Спочатку шукаємо активну або заплановану трансляцію через search.list без eventType
-            // EN: First search for active or upcoming stream via search.list without eventType
+            // UA: Спочатку шукаємо активну або заплановану трансляцію
+            // EN: First search for active or upcoming stream
             var liveResult = await CheckLiveAsync(youtubeService);
             if (liveResult != null) return liveResult;
 
@@ -43,8 +43,8 @@ namespace EMP.UAHelper.Core.Services
             return await GetLatestFromRssAsync();
         }
 
-        // UA: Перевірка активної трансляції через search.list з фільтром по liveBroadcastContent
-        // EN: Check for active stream via search.list filtered by liveBroadcastContent
+        // UA: Перевірка активної або запланованої трансляції через liveBroadcastContent
+        // EN: Check for active or upcoming stream via liveBroadcastContent
         private async Task<VideoInfo?> CheckLiveAsync(Google.Apis.YouTube.v3.YouTubeService service)
         {
             var request = service.Search.List("snippet");
@@ -54,8 +54,6 @@ namespace EMP.UAHelper.Core.Services
 
             var response = await request.ExecuteAsync();
 
-            // UA: Шукаємо відео з активною або запланованою трансляцією
-            // EN: Look for video with active or upcoming live broadcast
             foreach (var item in response.Items)
             {
                 if (item.Snippet.LiveBroadcastContent == "live")
@@ -67,15 +65,41 @@ namespace EMP.UAHelper.Core.Services
                     };
 
                 if (item.Snippet.LiveBroadcastContent == "upcoming")
+                {
+                    // UA: Отримуємо запланований час через videos.list (1 unit квоти)
+                    // EN: Get scheduled time via videos.list (1 quota unit)
+                    var scheduledTime = await GetScheduledTimeAsync(service, item.Id.VideoId);
                     return new VideoInfo
                     {
                         VideoId = item.Id.VideoId,
                         Title = item.Snippet.Title,
-                        Type = VideoType.Upcoming
+                        Type = VideoType.Upcoming,
+                        ScheduledStartTime = scheduledTime
                     };
+                }
             }
 
             return null;
+        }
+
+        // UA: Отримати запланований час початку трансляції як Unix timestamp
+        // EN: Get scheduled stream start time as Unix timestamp
+        private async Task<long?> GetScheduledTimeAsync(
+            Google.Apis.YouTube.v3.YouTubeService service,
+            string videoId)
+        {
+            var request = service.Videos.List("liveStreamingDetails");
+            request.Id = videoId;
+
+            var response = await request.ExecuteAsync();
+            var video = response.Items.FirstOrDefault();
+
+            var scheduledStart = video?.LiveStreamingDetails?.ScheduledStartTimeDateTimeOffset;
+            if (scheduledStart == null) return null;
+
+            // UA: Конвертуємо в Unix timestamp для Discord
+            // EN: Convert to Unix timestamp for Discord
+            return scheduledStart.Value.ToUnixTimeSeconds();
         }
 
         // UA: Отримати останнє відео або шортс через RSS фід (без витрат квоти)
