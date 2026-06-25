@@ -3,6 +3,7 @@
 // UA: Сервіс для завантаження та збереження шаблонів повідомлень
 // EN: Service for loading and saving message templates
 using EMP.UAHelper.Core.Models;
+using System.Globalization;
 using System.Text.Json;
 
 namespace EMP.UAHelper.Core.Services
@@ -50,14 +51,22 @@ namespace EMP.UAHelper.Core.Services
                 ? scheduledTime.Value.ToString()
                 : string.Empty;
 
-            // UA: Для Telegram конвертуємо в читабельний формат дати
-            // EN: For Telegram convert to human-readable date format
-            var scheduledTelegram = scheduledTime.HasValue
-                ? DateTimeOffset.FromUnixTimeSeconds(scheduledTime.Value)
-                    .ToOffset(TimeSpan.FromHours(3))
-                    .ToString("d MMMM о HH:mm (UTC+3)",
-                        new System.Globalization.CultureInfo("uk-UA"))
-                : string.Empty;
+            // UA: Для Telegram конвертуємо в київський час з урахуванням літнього/зимнього часу
+            // EN: For Telegram convert to Kyiv time respecting daylight saving time
+            var scheduledTelegram = string.Empty;
+            if (scheduledTime.HasValue)
+            {
+                var kyivZone = TimeZoneInfo.FindSystemTimeZoneById("FLE Standard Time");
+                var kyivTime = TimeZoneInfo.ConvertTime(
+                    DateTimeOffset.FromUnixTimeSeconds(scheduledTime.Value),
+                    kyivZone);
+                var offset = kyivZone.IsDaylightSavingTime(kyivTime.DateTime)
+                    ? "UTC+3"
+                    : "UTC+2";
+                scheduledTelegram = kyivTime
+                    .ToString($"d MMMM о HH:mm ({offset})",
+                        new CultureInfo("uk-UA"));
+            }
 
             return template
                 .Replace(VarTitle, title)
