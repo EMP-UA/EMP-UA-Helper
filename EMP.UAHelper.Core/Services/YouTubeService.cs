@@ -14,8 +14,8 @@ namespace EMP.UAHelper.Core.Services
         private readonly string _apiKey;
         private readonly string _channelId;
 
-        // UA: RSS фід каналу не потребує API ключа і не витрачає квоту
-        // EN: Channel RSS feed requires no API key and uses no quota
+        // UA: RSS фід каналу — без квоти, без OAuth
+        // EN: Channel RSS feed — no quota, no OAuth
         private string RssUrl => $"https://www.youtube.com/feeds/videos.xml?channel_id={_channelId}";
 
         public YouTubeService(string apiKey, string channelId)
@@ -33,78 +33,19 @@ namespace EMP.UAHelper.Core.Services
                 ApiKey = _apiKey
             });
 
-            // UA: Спочатку шукаємо активну або заплановану трансляцію
-            // EN: First search for active or upcoming stream
-            var liveResult = await CheckLiveAsync(youtubeService);
-            if (liveResult != null) return liveResult;
+            // UA: Крок 1 — отримуємо ID останніх відео з RSS (без квоти)
+            // EN: Step 1 — get latest video IDs from RSS (no quota cost)
+            var videoIds = await GetVideoIdsFromRssAsync();
+            if (videoIds.Count == 0) return null;
 
-            // UA: Якщо трансляції немає — беремо останнє відео з RSS (без квоти)
-            // EN: If no stream — get latest video from RSS (no quota cost)
-            return await GetLatestFromRssAsync();
+            // UA: Крок 2 — один запит videos.list для всіх ID (1 unit квоти)
+            // EN: Step 2 — single videos.list request for all IDs (1 quota unit)
+            return await GetVideoInfoAsync(youtubeService, videoIds);
         }
 
-        // UA: Перевірка активної або запланованої трансляції через liveBroadcastContent
-        // EN: Check for active or upcoming stream via liveBroadcastContent
-        private async Task<VideoInfo?> CheckLiveAsync(Google.Apis.YouTube.v3.YouTubeService service)
-        {
-            var request = service.Search.List("snippet");
-            request.ChannelId = _channelId;
-            request.Type = "video";
-            request.MaxResults = 5;
-
-            var response = await request.ExecuteAsync();
-
-            foreach (var item in response.Items)
-            {
-                if (item.Snippet.LiveBroadcastContent == "live")
-                    return new VideoInfo
-                    {
-                        VideoId = item.Id.VideoId,
-                        Title = item.Snippet.Title,
-                        Type = VideoType.Live
-                    };
-
-                if (item.Snippet.LiveBroadcastContent == "upcoming")
-                {
-                    // UA: Отримуємо запланований час через videos.list (1 unit квоти)
-                    // EN: Get scheduled time via videos.list (1 quota unit)
-                    var scheduledTime = await GetScheduledTimeAsync(service, item.Id.VideoId);
-                    return new VideoInfo
-                    {
-                        VideoId = item.Id.VideoId,
-                        Title = item.Snippet.Title,
-                        Type = VideoType.Upcoming,
-                        ScheduledStartTime = scheduledTime
-                    };
-                }
-            }
-
-            return null;
-        }
-
-        // UA: Отримати запланований час початку трансляції як Unix timestamp
-        // EN: Get scheduled stream start time as Unix timestamp
-        private async Task<long?> GetScheduledTimeAsync(
-            Google.Apis.YouTube.v3.YouTubeService service,
-            string videoId)
-        {
-            var request = service.Videos.List("liveStreamingDetails");
-            request.Id = videoId;
-
-            var response = await request.ExecuteAsync();
-            var video = response.Items.FirstOrDefault();
-
-            var scheduledStart = video?.LiveStreamingDetails?.ScheduledStartTimeDateTimeOffset;
-            if (scheduledStart == null) return null;
-
-            // UA: Конвертуємо в Unix timestamp для Discord
-            // EN: Convert to Unix timestamp for Discord
-            return scheduledStart.Value.ToUnixTimeSeconds();
-        }
-
-        // UA: Отримати останнє відео або шортс через RSS фід (без витрат квоти)
-        // EN: Get latest video or short via RSS feed (no quota cost)
-        private async Task<VideoInfo?> GetLatestFromRssAsync()
+        // UA: Отримати список ID відео з RSS фіду
+        // EN: Get list of video IDs from RSS feed
+        private async Task<List<string>> GetVideoIdsFromRssAsync()
         {
             using var httpClient = new HttpClient();
             var xml = await httpClient.GetStringAsync(RssUrl);
@@ -113,21 +54,73 @@ namespace EMP.UAHelper.Core.Services
             XNamespace ns = "http://www.w3.org/2005/Atom";
             XNamespace yt = "http://www.youtube.com/xml/schemas/2015";
 
-            var entry = doc.Descendants(ns + "entry").FirstOrDefault();
-            if (entry == null) return null;
+            // UA: Беремо останні 5 відео щоб охопити можливу трансляцію
+            // EN: Take last 5 videos to cover possible stream
+            return doc.Descendants(ns + "entry")
+                .Take(5)
+                .Select(e => e.Element(yt + "videoId")?.Value ?? string.Empty)
+                .Where(id => !string.IsNullOrEmpty(id))
+                .ToList();
+        }
 
-            var videoId = entry.Element(yt + "videoId")?.Value ?? string.Empty;
-            var title = entry.Element(ns + "title")?.Value ?? string.Empty;
+        // UA: Отримати інформацію про відео через videos.list
+        // EN: Get video information via videos.list
+        private async Task<VideoInfo?> GetVideoInfoAsync(
+            Google.Apis.YouTube.v3.YouTubeService service,
+            List<string> videoIds)
+        {
+            var request = service.Videos.List("snippet,contentDetails,liveStreamingDetails");
+            request.Id = string.Join(",", videoIds);
 
-            // UA: Визначаємо чи це шортс через #Shorts в назві
-            // EN: Detect if it's a Short by checking #Shorts in title
-            bool isShort = title.Contains("#Shorts", StringComparison.OrdinalIgnoreCase)
-                        || title.Contains("#Short", StringComparison.OrdinalIgnoreCase);
+            var response = await request.ExecuteAsync();
+            if (response.Items.Count == 0) return null;
+
+            // UA: Спочатку шукаємо активну трансляцію
+            // EN: First look for active live stream
+            var live = response.Items.FirstOrDefault(
+                v => v.Snippet.LiveBroadcastContent == "live");
+            if (live != null)
+                return new VideoInfo
+                {
+                    VideoId = live.Id,
+                    Title = live.Snippet.Title,
+                    Type = VideoType.Live
+                };
+
+            // UA: Потім шукаємо заплановану трансляцію
+            // EN: Then look for upcoming stream
+            var upcoming = response.Items.FirstOrDefault(
+                v => v.Snippet.LiveBroadcastContent == "upcoming");
+            if (upcoming != null)
+            {
+                var scheduledStart = upcoming.LiveStreamingDetails?.ScheduledStartTimeDateTimeOffset;
+                return new VideoInfo
+                {
+                    VideoId = upcoming.Id,
+                    Title = upcoming.Snippet.Title,
+                    Type = VideoType.Upcoming,
+                    ScheduledStartTime = scheduledStart.HasValue
+                        ? scheduledStart.Value.ToUnixTimeSeconds()
+                        : null
+                };
+            }
+
+            // UA: Якщо трансляцій немає — беремо перше звичайне відео або шортс
+            // EN: If no streams — take first regular video or short
+            var latest = response.Items.FirstOrDefault(
+                v => v.Snippet.LiveBroadcastContent == "none");
+            if (latest == null) return null;
+
+            // UA: Визначаємо шортс через duration <= 60 секунд
+            // EN: Detect short via duration <= 60 seconds
+            var duration = System.Xml.XmlConvert.ToTimeSpan(
+                latest.ContentDetails.Duration);
+            bool isShort = duration.TotalSeconds <= 60;
 
             return new VideoInfo
             {
-                VideoId = videoId,
-                Title = title,
+                VideoId = latest.Id,
+                Title = latest.Snippet.Title,
                 Type = isShort ? VideoType.Short : VideoType.Video
             };
         }
