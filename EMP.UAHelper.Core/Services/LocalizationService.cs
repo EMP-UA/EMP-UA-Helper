@@ -8,12 +8,8 @@ namespace EMP.UAHelper.Core.Services
 
     public class LocalizationService
     {
-        // UA: Поточна мова інтерфейсу
-        // EN: Current UI language
         public UiLanguage Language { get; private set; } = UiLanguage.UA;
 
-        // UA: Подія зміни мови — підписуються всі вікна
-        // EN: Language changed event — all windows subscribe
         public event Action? LanguageChanged;
 
         public void SetLanguage(UiLanguage language)
@@ -22,18 +18,13 @@ namespace EMP.UAHelper.Core.Services
             LanguageChanged?.Invoke();
         }
 
-        // UA: Отримати рядок за ключем
-        // EN: Get string by key
         public string Get(string key) =>
             Language == UiLanguage.UA
                 ? UA.TryGetValue(key, out var ua) ? ua : key
                 : EN.TryGetValue(key, out var en) ? en : key;
 
-        // UA: Рядки українською
-        // EN: Ukrainian strings
         private static readonly Dictionary<string, string> UA = new()
         {
-            // UA: Загальне / EN: General
             ["app.name"] = "EMP UA Helper",
             ["app.save"] = "💾 Зберегти",
             ["app.cancel"] = "Скасувати",
@@ -44,8 +35,8 @@ namespace EMP.UAHelper.Core.Services
             ["app.yes"] = "Так",
             ["app.no"] = "Ні",
 
-            // UA: Трей / EN: Tray
             ["tray.send"] = "📡 Надіслати сповіщення",
+            ["tray.manual"] = "✍️ Ручне сповіщення",
             ["tray.edit_templates"] = "✏️ Редагувати шаблони",
             ["tray.settings"] = "⚙️ Налаштування",
             ["tray.exit"] = "Вихід",
@@ -56,22 +47,25 @@ namespace EMP.UAHelper.Core.Services
             ["tray.started"] = "EMP UA Helper запущено.",
             ["tray.stopped"] = "EMP UA Helper завершено.",
 
-            // UA: Типи контенту / EN: Content types
             ["type.live"] = "🟢 Трансляція",
             ["type.upcoming"] = "🔔 Анонс",
             ["type.video"] = "💾 Відео",
             ["type.short"] = "⚡ Шортс",
 
-            // UA: Вікно першого запуску / EN: First run window
             ["firstrun.title"] = "EMP UA Helper — Перший запуск",
             ["firstrun.welcome"] = "Ласкаво просимо до EMP UA Helper",
-            ["firstrun.description"] = "Заповніть налаштування для підключення до Telegram, YouTube та Discord. Дані зберігаються локально поруч з програмою.",
+            ["firstrun.description"] = "Заповніть налаштування для потрібних вам платформ. Це можна будь-коли змінити пізніше через трей → «⚙️ Налаштування» — без перезапуску програми.",
             ["firstrun.save"] = "💾 Зберегти та запустити",
-            ["firstrun.validation"] = "Будь ласка, заповніть усі поля.",
+            ["firstrun.validation"] = "Будь ласка, заповніть усі поля увімкнених платформ.",
+            ["firstrun.validation.platform"] = "Оберіть принаймні одну платформу сповіщень: Telegram або Discord.",
             ["firstrun.section.telegram"] = "TELEGRAM",
             ["firstrun.section.youtube"] = "YOUTUBE",
             ["firstrun.section.discord"] = "DISCORD",
             ["firstrun.section.twitch"] = "TWITCH",
+            ["firstrun.use.telegram"] = "Використовувати Telegram",
+            ["firstrun.use.youtube"] = "Використовувати YouTube",
+            ["firstrun.use.discord"] = "Використовувати Discord",
+            ["firstrun.use.twitch"] = "Додавати посилання на Twitch",
             ["firstrun.tg.token"] = "Bot Token",
             ["firstrun.tg.token.hint"] = "@BotFather → /newbot або /token",
             ["firstrun.tg.channel"] = "Канал-отримувач",
@@ -87,7 +81,13 @@ namespace EMP.UAHelper.Core.Services
             ["firstrun.tw.url"] = "Channel URL",
             ["firstrun.tw.url.hint"] = "https://www.twitch.tv/your_channel",
 
-            // UA: Редактор шаблонів / EN: Template editor
+            ["settings.title"] = "EMP UA Helper — Налаштування",
+            ["settings.header"] = "Налаштування платформ",
+            ["settings.description"] = "Оберіть, які платформи активні саме сьогодні. Зміни застосовуються одразу, без перезапуску програми.",
+            ["settings.save"] = "💾 Зберегти зміни",
+            ["settings.group.content"] = "ДЖЕРЕЛА КОНТЕНТУ (де ви стрімите / публікуєте)",
+            ["settings.group.notify"] = "ПЛАТФОРМИ СПОВІЩЕНЬ (куди надсилати анонси)",
+
             ["templates.title"] = "EMP UA Helper — Редактор шаблонів",
             ["templates.header"] = "Редактор шаблонів повідомлень",
             ["templates.hint"] = "Змінні: {title} — назва    {url} — YouTube    {twitch} — Twitch    {scheduled_telegram} — дата/час (Telegram, Upcoming)    {scheduled_discord} — Unix час (Discord, Upcoming)",
@@ -104,13 +104,25 @@ namespace EMP.UAHelper.Core.Services
             ["templates.upcoming"] = "🔔 Upcoming — запланована трансляція",
             ["templates.video"] = "💾 Video — звичайне відео",
             ["templates.short"] = "⚡ Short — шортс",
+
+            ["manual.title"] = "EMP UA Helper — Ручне сповіщення",
+            ["manual.header"] = "Ручне сповіщення",
+            ["manual.description"] = "Сповіщення незалежне від автоматичного виявлення YouTube — використовуйте його для будь-якого анонсу, коли він потрібен саме зараз.",
+            ["manual.title_label"] = "Заголовок",
+            ["manual.type_label"] = "Тип",
+            ["manual.type_hint"] = "Категорія впливає лише на шаблон і колір сповіщення — не залежить від конкретної платформи.",
+            ["manual.url_label"] = "Посилання (необов'язково)",
+            ["manual.url_hint"] = "Якщо вказати посилання — воно підставиться замість {url} у шаблоні. Якщо залишити порожнім — рядки шаблону з {url} просто не увійдуть у повідомлення.",
+            ["manual.date_label"] = "Дата початку (дд.MM.рррр)",
+            ["manual.time_label"] = "Час початку (гг:хх, Київ)",
+            ["manual.send"] = "📡 Надіслати",
+            ["manual.validation.title"] = "Введіть заголовок.",
+            ["manual.validation.datetime"] = "Введіть коректні дату і час у форматі дд.MM.рррр та гг:хх.",
+            ["manual.sent"] = "Сповіщення надіслано.",
         };
 
-        // UA: Рядки англійською
-        // EN: English strings
         private static readonly Dictionary<string, string> EN = new()
         {
-            // General
             ["app.name"] = "EMP UA Helper",
             ["app.save"] = "💾 Save",
             ["app.cancel"] = "Cancel",
@@ -121,8 +133,8 @@ namespace EMP.UAHelper.Core.Services
             ["app.yes"] = "Yes",
             ["app.no"] = "No",
 
-            // Tray
             ["tray.send"] = "📡 Send notification",
+            ["tray.manual"] = "✍️ Manual notification",
             ["tray.edit_templates"] = "✏️ Edit templates",
             ["tray.settings"] = "⚙️ Settings",
             ["tray.exit"] = "Exit",
@@ -133,22 +145,25 @@ namespace EMP.UAHelper.Core.Services
             ["tray.started"] = "EMP UA Helper started.",
             ["tray.stopped"] = "EMP UA Helper stopped.",
 
-            // Content types
             ["type.live"] = "🟢 Live stream",
             ["type.upcoming"] = "🔔 Upcoming stream",
             ["type.video"] = "💾 Video",
             ["type.short"] = "⚡ Short",
 
-            // First run window
             ["firstrun.title"] = "EMP UA Helper — First Run",
             ["firstrun.welcome"] = "Welcome to EMP UA Helper",
-            ["firstrun.description"] = "Fill in the settings to connect Telegram, YouTube and Discord. Data is stored locally next to the application.",
+            ["firstrun.description"] = "Fill in the settings for the platforms you need. You can change this anytime later via tray → \u201c⚙️ Settings\u201d — without restarting the app.",
             ["firstrun.save"] = "💾 Save and Launch",
-            ["firstrun.validation"] = "Please fill in all fields.",
+            ["firstrun.validation"] = "Please fill in all fields for the enabled platforms.",
+            ["firstrun.validation.platform"] = "Please select at least one notification platform: Telegram or Discord.",
             ["firstrun.section.telegram"] = "TELEGRAM",
             ["firstrun.section.youtube"] = "YOUTUBE",
             ["firstrun.section.discord"] = "DISCORD",
             ["firstrun.section.twitch"] = "TWITCH",
+            ["firstrun.use.telegram"] = "Use Telegram",
+            ["firstrun.use.youtube"] = "Use YouTube",
+            ["firstrun.use.discord"] = "Use Discord",
+            ["firstrun.use.twitch"] = "Include Twitch link",
             ["firstrun.tg.token"] = "Bot Token",
             ["firstrun.tg.token.hint"] = "@BotFather → /newbot or /token",
             ["firstrun.tg.channel"] = "Target Channel",
@@ -164,7 +179,13 @@ namespace EMP.UAHelper.Core.Services
             ["firstrun.tw.url"] = "Channel URL",
             ["firstrun.tw.url.hint"] = "https://www.twitch.tv/your_channel",
 
-            // Template editor
+            ["settings.title"] = "EMP UA Helper — Settings",
+            ["settings.header"] = "Platform Settings",
+            ["settings.description"] = "Choose which platforms are active today. Changes apply immediately, without restarting the app.",
+            ["settings.save"] = "💾 Save changes",
+            ["settings.group.content"] = "CONTENT SOURCES (where you stream / publish)",
+            ["settings.group.notify"] = "NOTIFICATION PLATFORMS (where to send announcements)",
+
             ["templates.title"] = "EMP UA Helper — Template Editor",
             ["templates.header"] = "Message Template Editor",
             ["templates.hint"] = "Variables: {title} — title    {url} — YouTube    {twitch} — Twitch    {scheduled_telegram} — date/time (Telegram, Upcoming)    {scheduled_discord} — Unix time (Discord, Upcoming)",
@@ -181,6 +202,21 @@ namespace EMP.UAHelper.Core.Services
             ["templates.upcoming"] = "🔔 Upcoming — scheduled stream",
             ["templates.video"] = "💾 Video — regular video",
             ["templates.short"] = "⚡ Short — short video",
+
+            ["manual.title"] = "EMP UA Helper — Manual Notification",
+            ["manual.header"] = "Manual Notification",
+            ["manual.description"] = "A notification independent of YouTube auto-detection — use it for any announcement whenever you need one right now.",
+            ["manual.title_label"] = "Title",
+            ["manual.type_label"] = "Type",
+            ["manual.type_hint"] = "The category only affects the message template and color — it's not tied to any specific platform.",
+            ["manual.url_label"] = "Link (optional)",
+            ["manual.url_hint"] = "If you provide a link, it replaces {url} in the template. If left empty, template lines containing {url} are simply omitted from the message.",
+            ["manual.date_label"] = "Start date (dd.MM.yyyy)",
+            ["manual.time_label"] = "Start time (HH:mm, Kyiv)",
+            ["manual.send"] = "📡 Send",
+            ["manual.validation.title"] = "Please enter a title.",
+            ["manual.validation.datetime"] = "Enter a valid date and time in dd.MM.yyyy and HH:mm format.",
+            ["manual.sent"] = "Notification sent.",
         };
     }
 }

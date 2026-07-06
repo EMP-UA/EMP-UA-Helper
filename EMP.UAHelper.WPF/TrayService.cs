@@ -11,27 +11,27 @@ namespace EMP.UAHelper.WPF
 {
     public class TrayService : IDisposable
     {
-        private readonly YouTubeService _youTubeService;
-        private readonly TelegramService _telegramService;
-        private readonly DiscordService _discordService;
-        private readonly CrashLogService _crashLogService;
+        private AppSettings _settings;
         private readonly TemplateService _templateService;
+        private readonly CrashLogService _crashLogService;
         private readonly LocalizationService _loc;
+
+        // UA: Перебудовуються при кожній зміні налаштувань платформ (ApplyServices)
+        // EN: Rebuilt every time platform settings change (ApplyServices)
+        private YouTubeService? _youTubeService;
+        private NotificationDispatcher _dispatcher = null!;
+
         private NotifyIcon? _trayIcon;
 
         public TrayService(
-            YouTubeService youTubeService,
-            TelegramService telegramService,
-            DiscordService discordService,
-            CrashLogService crashLogService,
+            AppSettings settings,
             TemplateService templateService,
+            CrashLogService crashLogService,
             LocalizationService loc)
         {
-            _youTubeService = youTubeService;
-            _telegramService = telegramService;
-            _discordService = discordService;
-            _crashLogService = crashLogService;
+            _settings = settings;
             _templateService = templateService;
+            _crashLogService = crashLogService;
             _loc = loc;
         }
 
@@ -39,6 +39,8 @@ namespace EMP.UAHelper.WPF
         // EN: Initialize tray icon and context menu
         public void Initialize()
         {
+            ApplyServices(_settings);
+
             _trayIcon = new NotifyIcon
             {
                 Icon = SystemIcons.Shield,
@@ -55,6 +57,26 @@ namespace EMP.UAHelper.WPF
             _ = _crashLogService.LogInfoAsync(_loc.Get("tray.started"));
         }
 
+        // UA: (Пере)будувати сервіси платформ з поточних налаштувань
+        // EN: (Re)build platform services from the current settings
+        private void ApplyServices(AppSettings settings)
+        {
+            _settings = settings;
+            var (youTube, dispatcher) = ContentDispatchFactory.Build(settings, _templateService, _crashLogService);
+            _youTubeService = youTube;
+            _dispatcher = dispatcher;
+        }
+
+        // UA: Викликається з вікна налаштувань після збереження — застосовує нову
+        //     комбінацію платформ одразу, без перезапуску програми
+        // EN: Called from the settings window after saving — applies the new
+        //     platform combination immediately, without restarting the app
+        public void ReloadSettings(AppSettings settings)
+        {
+            ApplyServices(settings);
+            BuildMenu();
+        }
+
         // UA: Побудова контекстного меню
         // EN: Build context menu
         private void BuildMenu()
@@ -63,10 +85,26 @@ namespace EMP.UAHelper.WPF
 
             var menu = new ContextMenuStrip();
 
-            menu.Items.Add(_loc.Get("tray.send"), null, async (s, e) =>
-                await HandleNotificationAsync());
+            // UA: Автоперевірка YouTube — лише якщо джерело увімкнене "сьогодні"
+            // EN: YouTube auto-check — only if the source is enabled "today"
+            if (_youTubeService != null)
+            {
+                menu.Items.Add(_loc.Get("tray.send"), null, async (s, e) =>
+                    await HandleAutoNotificationAsync());
+                menu.Items.Add(new ToolStripSeparator());
+            }
+
+            // UA: Ручне сповіщення доступне ЗАВЖДИ — незалежно від того, скільки
+            //     платформ зараз увімкнено
+            // EN: Manual notification is ALWAYS available — regardless of how
+            //     many platforms are currently enabled
+            menu.Items.Add(_loc.Get("tray.manual"), null, (s, e) =>
+                OpenManualNotification());
 
             menu.Items.Add(new ToolStripSeparator());
+
+            menu.Items.Add(_loc.Get("tray.settings"), null, (s, e) =>
+                OpenSettings());
 
             menu.Items.Add(_loc.Get("tray.edit_templates"), null, (s, e) =>
                 OpenTemplateEditor());
@@ -82,19 +120,34 @@ namespace EMP.UAHelper.WPF
             _trayIcon.ContextMenuStrip = menu;
         }
 
-        // UA: Відкрити вікно редактора шаблонів
-        // EN: Open template editor window
         private void OpenTemplateEditor()
         {
             var editor = new TemplateEditorWindow(_templateService, _loc);
             editor.Show();
         }
 
-        // UA: Основна логіка — запит до YouTube і відправка сповіщень
-        // EN: Main logic — YouTube query and sending notifications
-        private async Task HandleNotificationAsync()
+        private void OpenManualNotification()
         {
-            if (_trayIcon == null) return;
+            var window = new ManualNotificationWindow(_dispatcher, _loc);
+            window.Show();
+        }
+
+        // UA: Відкрити вікно налаштувань платформ — дозволяє змінити комбінацію
+        //     Telegram/YouTube/Discord/Twitch будь-коли, без First Run заново
+        // EN: Open the platform settings window — allows changing the
+        //     Telegram/YouTube/Discord/Twitch combination anytime, without
+        //     going through First Run again
+        private void OpenSettings()
+        {
+            var window = new SettingsWindow(_settings, _loc, ReloadSettings);
+            window.Show();
+        }
+
+        // UA: Автоматична гілка — запит до YouTube і відправка сповіщень
+        // EN: Automatic branch — YouTube query and sending notifications
+        private async Task HandleAutoNotificationAsync()
+        {
+            if (_trayIcon == null || _youTubeService == null) return;
 
             try
             {
@@ -112,8 +165,6 @@ namespace EMP.UAHelper.WPF
                     return;
                 }
 
-                await _crashLogService.LogInfoAsync($"[{video.Type}] {video.Title} ({video.Url})");
-
                 var typeLabel = video.Type switch
                 {
                     VideoType.Live => _loc.Get("type.live"),
@@ -125,10 +176,7 @@ namespace EMP.UAHelper.WPF
 
                 await _crashLogService.LogInfoAsync(_loc.Get("tray.sending"));
 
-                await Task.WhenAll(
-                    _telegramService.SendNotificationAsync(video),
-                    _discordService.SendNotificationAsync(video)
-                );
+                await _dispatcher.SendAsync(video);
 
                 await _crashLogService.LogInfoAsync(_loc.Get("tray.sent"));
 

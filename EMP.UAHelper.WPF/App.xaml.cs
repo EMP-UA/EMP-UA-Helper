@@ -46,31 +46,16 @@ namespace EMP.UAHelper.WPF
             if (settings.UiLanguage?.ToLower() == "en")
                 localizationService.SetLanguage(UiLanguage.EN);
 
-            // UA: Ініціалізуємо сервіси
-            // EN: Initialize services
+            // UA: Базові сервіси, побудова платформ делегована TrayService
+            //     (через ContentDispatchFactory), щоб їх можна було
+            //     перебудувати з вікна налаштувань без перезапуску
+            // EN: Base services — platform construction is delegated to
+            //     TrayService (via ContentDispatchFactory) so it can be
+            //     rebuilt from the settings window without restarting
             var crashLogService = new CrashLogService();
             var templateService = new TemplateService();
-            var youTubeService = new YouTubeService(settings.YoutubeApiKey, settings.ChannelId);
-            var telegramService = new TelegramService(
-                settings.TelegramBotToken,
-                settings.ChannelUsername,
-                settings.TwitchUrl,
-                templateService);
-            var discordService = new DiscordService(
-                settings.DiscordWebhookUrl,
-                settings.TwitchUrl,
-                settings.DiscordRoleId,
-                templateService);
 
-            // UA: Запускаємо трей
-            // EN: Start tray
-            _trayService = new TrayService(
-                youTubeService,
-                telegramService,
-                discordService,
-                crashLogService,
-                templateService,
-                localizationService);
+            _trayService = new TrayService(settings, templateService, crashLogService, localizationService);
             _trayService.Initialize();
         }
 

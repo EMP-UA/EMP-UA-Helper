@@ -4,6 +4,7 @@
 // EN: Service for loading and saving message templates
 using EMP.UAHelper.Core.Models;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 
 namespace EMP.UAHelper.Core.Services
@@ -40,8 +41,12 @@ namespace EMP.UAHelper.Core.Services
             await File.WriteAllTextAsync(_templatesPath, json);
         }
 
-        // UA: Застосувати змінні до шаблону
-        // EN: Apply variables to template
+        // UA: Застосувати змінні до шаблону. Рядки, що посилаються на {url} або {twitch},
+        //     видаляються цілком, якщо відповідні дані порожні — щоб не лишати биті посилання
+        //     для тих, хто не використовує YouTube/Twitch
+        // EN: Apply variables to a template. Lines referencing {url} or {twitch}
+        //     are removed entirely when the corresponding data is empty — to avoid
+        //     dangling links for those who don't use YouTube/Twitch
         public string Apply(string template, string title, string url,
             string twitchUrl, long? scheduledTime = null)
         {
@@ -68,7 +73,15 @@ namespace EMP.UAHelper.Core.Services
                         new CultureInfo("uk-UA"));
             }
 
-            return template
+            // UA: Прибираємо рядки, що посилаються на дані яких немає
+            // EN: Strip lines that reference data which isn't available
+            var lines = template.Replace("\r\n", "\n").Split('\n');
+            var filtered = lines.Where(line =>
+                !(string.IsNullOrEmpty(url) && line.Contains(VarUrl)) &&
+                !(string.IsNullOrEmpty(twitchUrl) && line.Contains(VarTwitch)));
+            var cleaned = string.Join("\n", filtered);
+
+            return cleaned
                 .Replace(VarTitle, title)
                 .Replace(VarUrl, url)
                 .Replace(VarTwitch, twitchUrl)

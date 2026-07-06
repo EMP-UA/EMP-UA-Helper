@@ -3,6 +3,7 @@
 // UA: Сервіс для відправки сповіщень у Discord через вебхук
 // EN: Service for sending notifications to Discord via webhook
 using EMP.UAHelper.Core.Models;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -70,27 +71,32 @@ namespace EMP.UAHelper.Core.Services
                 _twitchUrl,
                 video.ScheduledStartTime);
 
-            var payload = new
+            // UA: Embed будуємо через Dictionary, щоб мати змогу умовно пропустити
+            //     image, якщо превʼю немає (ручне сповіщення без YouTube)
+            // EN: Build the embed via Dictionary so we can conditionally skip
+            //     the image when there's no thumbnail (manual notification without YouTube)
+            var embed = new Dictionary<string, object>
             {
-                // UA: Пінг ролі — відображається над embed
-                // EN: Role mention — displayed above the embed
-                content = $"<@&{_roleId}>",
-                embeds = new[]
-                {
-                    new
-                    {
-                        title = embedTitle,
-                        description,
-                        color,
-                        // UA: Превью зображення відео
-                        // EN: Video thumbnail image
-                        image = new { url = video.ThumbnailUrl },
-                        // UA: Підпис embed в тематиці EMP
-                        // EN: Embed footer in EMP theme
-                        footer = new { text = "Silence will fall." }
-                    }
-                }
+                ["title"] = embedTitle,
+                ["description"] = description,
+                ["color"] = color,
+                // UA: Підпис embed в тематиці EMP
+                // EN: Embed footer in EMP theme
+                ["footer"] = new { text = "Silence will fall." }
             };
+
+            if (!string.IsNullOrEmpty(video.ThumbnailUrl))
+                embed["image"] = new { url = video.ThumbnailUrl };
+
+            var payload = new Dictionary<string, object>
+            {
+                ["embeds"] = new[] { embed }
+            };
+
+            // UA: Пінг ролі додаємо лише якщо RoleId заданий
+            // EN: Add the role mention only if RoleId is set
+            if (!string.IsNullOrEmpty(_roleId))
+                payload["content"] = $"<@&{_roleId}>";
 
             var json = JsonSerializer.Serialize(payload);
             using var httpClient = new HttpClient();

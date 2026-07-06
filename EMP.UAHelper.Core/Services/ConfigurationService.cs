@@ -36,6 +36,22 @@ namespace EMP.UAHelper.Core.Services
         // EN: Twitch channel URL
         public string TwitchUrl { get; set; } = string.Empty;
 
+        // UA: Чи використовувати Telegram (дефолт true для сумісності зі старими appsettings.json)
+        // EN: Whether to use Telegram (defaults to true for backward compatibility with old appsettings.json)
+        public bool UseTelegram { get; set; } = true;
+
+        // UA: Чи використовувати Discord
+        // EN: Whether to use Discord
+        public bool UseDiscord { get; set; } = true;
+
+        // UA: Чи використовувати YouTube як джерело автовиявлення контенту
+        // EN: Whether to use YouTube as the auto-detection content source
+        public bool UseYouTube { get; set; } = true;
+
+        // UA: Чи додавати посилання на Twitch у шаблони
+        // EN: Whether to include the Twitch link in templates
+        public bool UseTwitch { get; set; } = true;
+
         // UA: Мова інтерфейсу (uk/en)
         // EN: UI language (uk/en)
         public string? UiLanguage { get; set; }

@@ -1,7 +1,11 @@
 ﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
 // Donate: https://ko-fi.com/emp_ua
-// UA: Логіка вікна першого запуску
-// EN: First run window code-behind
+// UA: Код вікна налаштувань — попередньо заповнене поточними значеннями,
+//     секрети замасковані за замовчуванням, застосовує зміни одразу
+//     через переданий callback
+// EN: Settings window code-behind — pre-filled with current values,
+//     secrets masked by default, applies changes immediately via the
+//     provided callback
 using EMP.UAHelper.Core.Services;
 using System.IO;
 using System.Text.Json;
@@ -14,28 +18,66 @@ using Color = System.Windows.Media.Color;
 
 namespace EMP.UAHelper.WPF
 {
-    public partial class FirstRunWindow : Window
+    public partial class SettingsWindow : Window
     {
         private readonly LocalizationService _loc;
+        private readonly Action<AppSettings> _onSaved;
 
         private readonly string _settingsPath =
             Path.Combine(AppContext.BaseDirectory, "appsettings.json");
 
-        public FirstRunWindow(LocalizationService loc)
+        public SettingsWindow(AppSettings current, LocalizationService loc, Action<AppSettings> onSaved)
         {
             InitializeComponent();
             _loc = loc;
+            _onSaved = onSaved;
             _loc.LanguageChanged += ApplyLocalization;
+
             ApplyLocalization();
+            LoadCurrentSettings(current);
         }
 
-        // UA: Застосувати локалізацію до всіх елементів
-        // EN: Apply localization to all elements
+        // UA: Попередньо заповнюємо поля та чекбокси поточними значеннями.
+        //     Секретні поля завжди відкриваються замасковані — незалежно від
+        //     того, чи вони показувались відкритими минулого разу
+        // EN: Pre-fill fields and checkboxes with current values.
+        //     Secret fields always open masked — regardless of whether they
+        //     were shown unmasked last time
+        private void LoadCurrentSettings(AppSettings s)
+        {
+            ChkUseTelegram.IsChecked = s.UseTelegram;
+            ChkUseYoutube.IsChecked = s.UseYouTube;
+            ChkUseDiscord.IsChecked = s.UseDiscord;
+            ChkUseTwitch.IsChecked = s.UseTwitch;
+
+            TelegramTokenSecure.Password = s.TelegramBotToken;
+            TelegramTokenPlain.Text = s.TelegramBotToken;
+            TelegramChannel.Text = string.IsNullOrEmpty(s.ChannelUsername) ? "@" : s.ChannelUsername;
+
+            YoutubeKeySecure.Password = s.YoutubeApiKey;
+            YoutubeKeyPlain.Text = s.YoutubeApiKey;
+            YoutubeChannelId.Text = s.ChannelId;
+
+            var webhook = string.IsNullOrEmpty(s.DiscordWebhookUrl)
+                ? "https://discord.com/api/webhooks/" : s.DiscordWebhookUrl;
+            DiscordWebhookSecure.Password = webhook;
+            DiscordWebhookPlain.Text = webhook;
+            DiscordRoleId.Text = s.DiscordRoleId;
+
+            TwitchUrl.Text = string.IsNullOrEmpty(s.TwitchUrl)
+                ? "https://www.twitch.tv/" : s.TwitchUrl;
+
+            PanelTelegram.Visibility = s.UseTelegram ? Visibility.Visible : Visibility.Collapsed;
+            PanelYoutube.Visibility = s.UseYouTube ? Visibility.Visible : Visibility.Collapsed;
+            PanelDiscord.Visibility = s.UseDiscord ? Visibility.Visible : Visibility.Collapsed;
+            PanelTwitch.Visibility = s.UseTwitch ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private void ApplyLocalization()
         {
-            Title = _loc.Get("firstrun.title");
-            TxtWelcome.Text = _loc.Get("firstrun.welcome");
-            TxtDescription.Text = _loc.Get("firstrun.description");
+            Title = _loc.Get("settings.title");
+            TxtHeader.Text = _loc.Get("settings.header");
+            TxtDescription.Text = _loc.Get("settings.description");
             TxtGroupContent.Text = _loc.Get("settings.group.content");
             TxtGroupNotify.Text = _loc.Get("settings.group.notify");
             TxtSectionTelegram.Text = _loc.Get("firstrun.section.telegram");
@@ -56,7 +98,7 @@ namespace EMP.UAHelper.WPF
             TxtDcRoleIdHint.Text = _loc.Get("firstrun.dc.roleid.hint");
             TxtTwUrl.Text = _loc.Get("firstrun.tw.url");
             TxtTwUrlHint.Text = _loc.Get("firstrun.tw.url.hint");
-            BtnSave.Content = _loc.Get("firstrun.save");
+            BtnSave.Content = _loc.Get("settings.save");
 
             ChkUseTelegram.Content = _loc.Get("firstrun.use.telegram");
             ChkUseYoutube.Content = _loc.Get("firstrun.use.youtube");
@@ -91,8 +133,6 @@ namespace EMP.UAHelper.WPF
             => PanelTwitch.Visibility = ChkUseTwitch.IsChecked == true
                 ? Visibility.Visible : Visibility.Collapsed;
 
-        // UA: Перемкнути видимість секретного поля між PasswordBox і TextBox
-        // EN: Toggle a secret field's visibility between PasswordBox and TextBox
         private void TogglePasswordVisibility(PasswordBox secure, TextBox plain, Button toggleButton)
         {
             if (plain.Visibility == Visibility.Visible)
@@ -120,10 +160,6 @@ namespace EMP.UAHelper.WPF
         private void ToggleDiscordWebhook_Click(object sender, RoutedEventArgs e)
             => TogglePasswordVisibility(DiscordWebhookSecure, DiscordWebhookPlain, BtnToggleDiscordWebhook);
 
-        // UA: Поточне значення секретного поля — незалежно від того, яка з двох
-        //     панелей (masked/plain) зараз показана
-        // EN: Current value of a secret field — regardless of which of the two
-        //     panels (masked/plain) is currently shown
         private static string SecureValue(PasswordBox secure, TextBox plain)
             => plain.Visibility == Visibility.Visible ? plain.Text : secure.Password;
 
@@ -194,8 +230,15 @@ namespace EMP.UAHelper.WPF
                 new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_settingsPath, json);
 
-            DialogResult = true;
+            _onSaved(settings);
+
             Close();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            _loc.LanguageChanged -= ApplyLocalization;
+            base.OnClosed(e);
         }
     }
 }

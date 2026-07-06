@@ -1,7 +1,7 @@
 ﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
 // Donate: https://ko-fi.com/emp_ua
-// UA: Модель що описує відео/трансляцію отриману з YouTube API
-// EN: Model describing a video/stream retrieved from YouTube API
+// UA: Модель що описує відео/трансляцію — з YouTube API або введену вручну
+// EN: Model describing a video/stream — from the YouTube API or entered manually
 namespace EMP.UAHelper.Core.Models
 {
     // UA: Тип контенту на каналі
@@ -27,8 +27,8 @@ namespace EMP.UAHelper.Core.Models
 
     public class VideoInfo
     {
-        // UA: Унікальний ID відео на YouTube
-        // EN: Unique YouTube video ID
+        // UA: Унікальний ID відео на YouTube (порожній для ручних сповіщень без YouTube)
+        // EN: Unique YouTube video ID (empty for manual notifications without YouTube)
         public string VideoId { get; set; } = string.Empty;
 
         // UA: Назва відео або трансляції
@@ -43,12 +43,24 @@ namespace EMP.UAHelper.Core.Models
         // EN: Scheduled stream start time (Unix timestamp for Discord)
         public long? ScheduledStartTime { get; set; }
 
-        // UA: Пряме посилання на відео
-        // EN: Direct link to the video
-        public string Url => $"https://www.youtube.com/watch?v={VideoId}";
+        // UA: Явний URL — використовується для ручних сповіщень або джерел, відмінних від YouTube
+        // EN: Explicit URL — used for manual notifications or non-YouTube sources
+        public string? UrlOverride { get; set; }
+
+        // UA: Явний URL превью — так само для ручних сповіщень
+        // EN: Explicit thumbnail URL — same for manual notifications
+        public string? ThumbnailOverride { get; set; }
+
+        // UA: Пряме посилання на відео — явний URL має пріоритет над YouTube ID
+        // EN: Direct link to the video — explicit URL takes priority over the YouTube ID
+        public string Url => !string.IsNullOrEmpty(UrlOverride)
+            ? UrlOverride
+            : (string.IsNullOrEmpty(VideoId) ? string.Empty : $"https://www.youtube.com/watch?v={VideoId}");
 
         // UA: Посилання на превью відео
         // EN: Video thumbnail URL
-        public string ThumbnailUrl => $"https://img.youtube.com/vi/{VideoId}/maxresdefault.jpg";
+        public string ThumbnailUrl => !string.IsNullOrEmpty(ThumbnailOverride)
+            ? ThumbnailOverride
+            : (string.IsNullOrEmpty(VideoId) ? string.Empty : $"https://img.youtube.com/vi/{VideoId}/maxresdefault.jpg");
     }
 }
