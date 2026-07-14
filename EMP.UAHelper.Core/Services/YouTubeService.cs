@@ -5,6 +5,7 @@
 using EMP.UAHelper.Core.Models;
 using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
+using System.Linq;
 using System.Xml.Linq;
 
 namespace EMP.UAHelper.Core.Services
@@ -13,6 +14,7 @@ namespace EMP.UAHelper.Core.Services
     {
         private readonly string _apiKey;
         private readonly string _channelId;
+        private readonly ContentCacheService _cache = new();
 
         // UA: RSS фід каналу — без квоти, без OAuth
         // EN: Channel RSS feed — no quota, no OAuth
@@ -24,23 +26,54 @@ namespace EMP.UAHelper.Core.Services
             _channelId = channelId;
         }
 
-        // UA: Отримати найактуальніший контент з каналу
-        // EN: Get the most recent content from the channel
+        // UA: Автоматичний вибір — той самий пріоритет, що й раніше:
+        //     активна трансляція > запланована > останнє звичайне відео/шортс.
+        //     Кожен виклик також оновлює локальний кеш кандидатів.
+        // EN: Automatic pick — same priority as before: live stream > upcoming >
+        //     latest regular video/short. Every call also refreshes the local
+        //     candidate cache.
         public async Task<VideoInfo?> GetLatestContentAsync()
+        {
+            var fetched = await FetchFromYouTubeAsync();
+            if (fetched.Count == 0) return null;
+
+            _cache.Merge(fetched.Select(ToCacheEntry));
+
+            var live = fetched.FirstOrDefault(v => v.Type == VideoType.Live);
+            if (live != null) return live;
+
+            var upcoming = fetched.FirstOrDefault(v => v.Type == VideoType.Upcoming);
+            if (upcoming != null) return upcoming;
+
+            return fetched.FirstOrDefault(v => v.Type == VideoType.Video || v.Type == VideoType.Short);
+        }
+
+        // UA: Повний пул кандидатів для ручного вибору в UI — свіжо отримані
+        //     з YouTube записи ТА все, що раніше осіло в локальному кеші
+        //     (зокрема заплановані трансляції, які вже випали з вікна останніх
+        //     записів RSS, але дата яких ще не настала)
+        // EN: Full candidate pool for manual UI selection — freshly fetched
+        //     YouTube entries AND everything previously cached locally
+        //     (including scheduled streams that already fell out of the RSS
+        //     recency window, but whose date hasn't arrived yet)
+        public async Task<List<ContentCacheEntry>> GetCandidatesAsync()
+        {
+            var fetched = await FetchFromYouTubeAsync();
+            _cache.Merge(fetched.Select(ToCacheEntry));
+            return _cache.GetAll();
+        }
+
+        private async Task<List<VideoInfo>> FetchFromYouTubeAsync()
         {
             var youtubeService = new Google.Apis.YouTube.v3.YouTubeService(new BaseClientService.Initializer()
             {
                 ApiKey = _apiKey
             });
 
-            // UA: Крок 1 — отримуємо ID останніх відео з RSS (без квоти)
-            // EN: Step 1 — get latest video IDs from RSS (no quota cost)
             var videoIds = await GetVideoIdsFromRssAsync();
-            if (videoIds.Count == 0) return null;
+            if (videoIds.Count == 0) return new List<VideoInfo>();
 
-            // UA: Крок 2 — один запит videos.list для всіх ID (1 unit квоти)
-            // EN: Step 2 — single videos.list request for all IDs (1 quota unit)
-            return await GetVideoInfoAsync(youtubeService, videoIds);
+            return await GetVideoInfoListAsync(youtubeService, videoIds);
         }
 
         // UA: Отримати список ID відео з RSS фіду
@@ -54,18 +87,22 @@ namespace EMP.UAHelper.Core.Services
             XNamespace ns = "http://www.w3.org/2005/Atom";
             XNamespace yt = "http://www.youtube.com/xml/schemas/2015";
 
-            // UA: Беремо останні 5 відео щоб охопити можливу трансляцію
-            // EN: Take last 5 videos to cover possible stream
+            // UA: YouTube сам обмежує цей фід ~15 записами незалежно від Take() —
+            //     запитуємо з невеликим запасом, щоб точно нічого не відкинути
+            // EN: YouTube itself caps this feed at ~15 entries regardless of
+            //     Take() — request slightly more just to be safe
             return doc.Descendants(ns + "entry")
-                .Take(5)
+                .Take(20)
                 .Select(e => e.Element(yt + "videoId")?.Value ?? string.Empty)
                 .Where(id => !string.IsNullOrEmpty(id))
                 .ToList();
         }
 
-        // UA: Отримати інформацію про відео через videos.list
-        // EN: Get video information via videos.list
-        private async Task<VideoInfo?> GetVideoInfoAsync(
+        // UA: Отримати деталі ВСІХ переданих ID одним запитом
+        //     (до 50 ID = 1 квота-юніт незалежно від їхньої кількості)
+        // EN: Get details for ALL passed IDs in a single request
+        //     (up to 50 IDs = 1 quota unit regardless of count)
+        private async Task<List<VideoInfo>> GetVideoInfoListAsync(
             Google.Apis.YouTube.v3.YouTubeService service,
             List<string> videoIds)
         {
@@ -73,56 +110,72 @@ namespace EMP.UAHelper.Core.Services
             request.Id = string.Join(",", videoIds);
 
             var response = await request.ExecuteAsync();
-            if (response.Items.Count == 0) return null;
+            var result = new List<VideoInfo>();
 
-            // UA: Спочатку шукаємо активну трансляцію
-            // EN: First look for active live stream
-            var live = response.Items.FirstOrDefault(
-                v => v.Snippet.LiveBroadcastContent == "live");
-            if (live != null)
-                return new VideoInfo
-                {
-                    VideoId = live.Id,
-                    Title = live.Snippet.Title,
-                    Type = VideoType.Live
-                };
-
-            // UA: Потім шукаємо заплановану трансляцію
-            // EN: Then look for upcoming stream
-            var upcoming = response.Items.FirstOrDefault(
-                v => v.Snippet.LiveBroadcastContent == "upcoming");
-            if (upcoming != null)
+            foreach (var item in response.Items)
             {
-                var scheduledStart = upcoming.LiveStreamingDetails?.ScheduledStartTimeDateTimeOffset;
-                return new VideoInfo
+                // UA: Ці два поля спільні для будь-якого типу контенту —
+                //     обчислюємо один раз, а не в кожній гілці нижче
+                // EN: These two fields are common to any content type —
+                //     compute once instead of per-branch below
+                var publishedAt = item.Snippet.PublishedAtDateTimeOffset;
+                var actualStart = item.LiveStreamingDetails?.ActualStartTimeDateTimeOffset;
+
+                if (item.Snippet.LiveBroadcastContent == "live")
                 {
-                    VideoId = upcoming.Id,
-                    Title = upcoming.Snippet.Title,
-                    Type = VideoType.Upcoming,
-                    ScheduledStartTime = scheduledStart.HasValue
-                        ? scheduledStart.Value.ToUnixTimeSeconds()
-                        : null
-                };
+                    result.Add(new VideoInfo
+                    {
+                        VideoId = item.Id,
+                        Title = item.Snippet.Title,
+                        Type = VideoType.Live,
+                        PublishedAt = publishedAt?.ToUnixTimeSeconds(),
+                        ActualStartTime = actualStart?.ToUnixTimeSeconds()
+                    });
+                    continue;
+                }
+
+                if (item.Snippet.LiveBroadcastContent == "upcoming")
+                {
+                    var scheduledStart = item.LiveStreamingDetails?.ScheduledStartTimeDateTimeOffset;
+                    result.Add(new VideoInfo
+                    {
+                        VideoId = item.Id,
+                        Title = item.Snippet.Title,
+                        Type = VideoType.Upcoming,
+                        ScheduledStartTime = scheduledStart?.ToUnixTimeSeconds(),
+                        PublishedAt = publishedAt?.ToUnixTimeSeconds(),
+                        ActualStartTime = actualStart?.ToUnixTimeSeconds()
+                    });
+                    continue;
+                }
+
+                if (item.Snippet.LiveBroadcastContent == "none")
+                {
+                    var duration = System.Xml.XmlConvert.ToTimeSpan(item.ContentDetails.Duration);
+                    bool isShort = duration.TotalSeconds <= 60;
+
+                    result.Add(new VideoInfo
+                    {
+                        VideoId = item.Id,
+                        Title = item.Snippet.Title,
+                        Type = isShort ? VideoType.Short : VideoType.Video,
+                        PublishedAt = publishedAt?.ToUnixTimeSeconds(),
+                        ActualStartTime = actualStart?.ToUnixTimeSeconds()
+                    });
+                }
             }
 
-            // UA: Якщо трансляцій немає — беремо перше звичайне відео або шортс
-            // EN: If no streams — take first regular video or short
-            var latest = response.Items.FirstOrDefault(
-                v => v.Snippet.LiveBroadcastContent == "none");
-            if (latest == null) return null;
-
-            // UA: Визначаємо шортс через duration <= 60 секунд
-            // EN: Detect short via duration <= 60 seconds
-            var duration = System.Xml.XmlConvert.ToTimeSpan(
-                latest.ContentDetails.Duration);
-            bool isShort = duration.TotalSeconds <= 60;
-
-            return new VideoInfo
-            {
-                VideoId = latest.Id,
-                Title = latest.Snippet.Title,
-                Type = isShort ? VideoType.Short : VideoType.Video
-            };
+            return result;
         }
+
+        private static ContentCacheEntry ToCacheEntry(VideoInfo v) => new()
+        {
+            VideoId = v.VideoId,
+            Title = v.Title,
+            Type = v.Type,
+            ScheduledStartTime = v.ScheduledStartTime,
+            PublishedAt = v.PublishedAt,
+            ActualStartTime = v.ActualStartTime
+        };
     }
 }

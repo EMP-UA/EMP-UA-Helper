@@ -8,9 +8,10 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Color = System.Windows.Media.Color;
+
 using TextBox = System.Windows.Controls.TextBox;
 using Button = System.Windows.Controls.Button;
-using Color = System.Windows.Media.Color;
 
 namespace EMP.UAHelper.WPF
 {
@@ -24,13 +25,28 @@ namespace EMP.UAHelper.WPF
         public FirstRunWindow(LocalizationService loc)
         {
             InitializeComponent();
+
+            // UA: Встановлюємо чекбокси ПРОГРАМНО, після InitializeComponent —
+            //     якщо задати IsChecked="True" прямо в XAML, подія Checked
+            //     спрацьовує під час побудови дерева елементів, коли пізніші
+            //     за розташуванням панелі (PanelYoutube тощо) ще не присвоєні
+            //     своїм полям, що спричиняє NullReferenceException
+            // EN: Set checkboxes PROGRAMMATICALLY, after InitializeComponent —
+            //     setting IsChecked="True" directly in XAML fires the Checked
+            //     event while the element tree is still being built, at a
+            //     point where panels declared later in the file (e.g.
+            //     PanelYoutube) aren't yet assigned to their fields, causing
+            //     a NullReferenceException
+            ChkUseTelegram.IsChecked = true;
+            ChkUseYoutube.IsChecked = true;
+            ChkUseDiscord.IsChecked = true;
+            ChkUseTwitch.IsChecked = true;
+
             _loc = loc;
             _loc.LanguageChanged += ApplyLocalization;
             ApplyLocalization();
         }
 
-        // UA: Застосувати локалізацію до всіх елементів
-        // EN: Apply localization to all elements
         private void ApplyLocalization()
         {
             Title = _loc.Get("firstrun.title");
@@ -75,24 +91,38 @@ namespace EMP.UAHelper.WPF
         private void BtnEN_Click(object sender, RoutedEventArgs e)
             => _loc.SetLanguage(UiLanguage.EN);
 
+        // UA: Захисні null-перевірки — додаткова страховка, навіть попри те,
+        //     що чекбокси тепер встановлюються після InitializeComponent
+        // EN: Defensive null checks — extra safety net, even though the
+        //     checkboxes are now set after InitializeComponent
         private void ChkUseTelegram_Changed(object sender, RoutedEventArgs e)
-            => PanelTelegram.Visibility = ChkUseTelegram.IsChecked == true
+        {
+            if (PanelTelegram == null) return;
+            PanelTelegram.Visibility = ChkUseTelegram.IsChecked == true
                 ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         private void ChkUseYoutube_Changed(object sender, RoutedEventArgs e)
-            => PanelYoutube.Visibility = ChkUseYoutube.IsChecked == true
+        {
+            if (PanelYoutube == null) return;
+            PanelYoutube.Visibility = ChkUseYoutube.IsChecked == true
                 ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         private void ChkUseDiscord_Changed(object sender, RoutedEventArgs e)
-            => PanelDiscord.Visibility = ChkUseDiscord.IsChecked == true
+        {
+            if (PanelDiscord == null) return;
+            PanelDiscord.Visibility = ChkUseDiscord.IsChecked == true
                 ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         private void ChkUseTwitch_Changed(object sender, RoutedEventArgs e)
-            => PanelTwitch.Visibility = ChkUseTwitch.IsChecked == true
+        {
+            if (PanelTwitch == null) return;
+            PanelTwitch.Visibility = ChkUseTwitch.IsChecked == true
                 ? Visibility.Visible : Visibility.Collapsed;
+        }
 
-        // UA: Перемкнути видимість секретного поля між PasswordBox і TextBox
-        // EN: Toggle a secret field's visibility between PasswordBox and TextBox
         private void TogglePasswordVisibility(PasswordBox secure, TextBox plain, Button toggleButton)
         {
             if (plain.Visibility == Visibility.Visible)
@@ -120,10 +150,6 @@ namespace EMP.UAHelper.WPF
         private void ToggleDiscordWebhook_Click(object sender, RoutedEventArgs e)
             => TogglePasswordVisibility(DiscordWebhookSecure, DiscordWebhookPlain, BtnToggleDiscordWebhook);
 
-        // UA: Поточне значення секретного поля — незалежно від того, яка з двох
-        //     панелей (masked/plain) зараз показана
-        // EN: Current value of a secret field — regardless of which of the two
-        //     panels (masked/plain) is currently shown
         private static string SecureValue(PasswordBox secure, TextBox plain)
             => plain.Visibility == Visibility.Visible ? plain.Text : secure.Password;
 

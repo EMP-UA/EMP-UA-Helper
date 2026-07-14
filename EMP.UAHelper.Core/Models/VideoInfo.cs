@@ -39,9 +39,23 @@ namespace EMP.UAHelper.Core.Models
         // EN: Content type
         public VideoType Type { get; set; }
 
-        // UA: Запланований час початку трансляції (Unix timestamp для Discord)
-        // EN: Scheduled stream start time (Unix timestamp for Discord)
+        // UA: Запланований час початку трансляції (лише для Upcoming)
+        // EN: Scheduled stream start time (Upcoming only)
         public long? ScheduledStartTime { get; set; }
+
+        // UA: Реальна дата публікації запису на YouTube (snippet.publishedAt) —
+        //     інформаційна, ніде не підставляється в шаблони
+        // EN: The record's real YouTube publish date (snippet.publishedAt) —
+        //     informational only, never substituted into templates
+        public long? PublishedAt { get; set; }
+
+        // UA: Реальний час старту, якщо запис колись був активною трансляцією
+        //     (liveStreamingDetails.actualStartTime) — точніший за PublishedAt
+        //     для завершених стримів
+        // EN: The real start time if the entry was ever a live broadcast
+        //     (liveStreamingDetails.actualStartTime) — more accurate than
+        //     PublishedAt for finished streams
+        public long? ActualStartTime { get; set; }
 
         // UA: Явний URL — використовується для ручних сповіщень або джерел, відмінних від YouTube
         // EN: Explicit URL — used for manual notifications or non-YouTube sources

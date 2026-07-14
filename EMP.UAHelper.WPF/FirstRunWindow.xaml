@@ -163,7 +163,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="TxtSectionYoutube" Grid.Column="0" Style="{StaticResource SectionLabel}"/>
-                <CheckBox x:Name="ChkUseYoutube" Grid.Column="1" IsChecked="True"
+                <CheckBox x:Name="ChkUseYoutube" Grid.Column="1"
                           Style="{StaticResource SectionCheckBox}"
                           Checked="ChkUseYoutube_Changed" Unchecked="ChkUseYoutube_Changed"/>
             </Grid>
@@ -195,7 +195,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="TxtSectionTwitch" Grid.Column="0" Style="{StaticResource SectionLabel}"/>
-                <CheckBox x:Name="ChkUseTwitch" Grid.Column="1" IsChecked="True"
+                <CheckBox x:Name="ChkUseTwitch" Grid.Column="1"
                           Style="{StaticResource SectionCheckBox}"
                           Checked="ChkUseTwitch_Changed" Unchecked="ChkUseTwitch_Changed"/>
             </Grid>
@@ -219,7 +219,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="TxtSectionTelegram" Grid.Column="0" Style="{StaticResource SectionLabel}"/>
-                <CheckBox x:Name="ChkUseTelegram" Grid.Column="1" IsChecked="True"
+                <CheckBox x:Name="ChkUseTelegram" Grid.Column="1"
                           Style="{StaticResource SectionCheckBox}"
                           Checked="ChkUseTelegram_Changed" Unchecked="ChkUseTelegram_Changed"/>
             </Grid>
@@ -252,7 +252,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="TxtSectionDiscord" Grid.Column="0" Style="{StaticResource SectionLabel}"/>
-                <CheckBox x:Name="ChkUseDiscord" Grid.Column="1" IsChecked="True"
+                <CheckBox x:Name="ChkUseDiscord" Grid.Column="1"
                           Style="{StaticResource SectionCheckBox}"
                           Checked="ChkUseDiscord_Changed" Unchecked="ChkUseDiscord_Changed"/>
             </Grid>

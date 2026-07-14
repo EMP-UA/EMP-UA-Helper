@@ -431,10 +431,17 @@ FodyWeavers.xsd
 # UA: Реальні налаштування з API ключами — не комітити
 # EN: Real settings with API keys — do not commit
 **/appsettings.json
+**/*.bak
 
 # UA: Персональні шаблони повідомлень — не комітити
 # EN: Personal message templates — do not commit
 **/templates.json
+
+# UA: Локальний кеш YouTube-контенту — не комітити (може містити назви ще
+#     неанонсованих запланованих трансляцій)
+# EN: Local YouTube content cache — do not commit (may contain titles of
+#     not-yet-announced scheduled streams)
+**/content-cache.json
 
 # UA: Логи програми — не комітити
 # EN: Application logs — do not commit
