@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-blue)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
 ![License](https://img.shields.io/badge/License-GPL%20v3-green)
-![Version](https://img.shields.io/badge/Version-1.2.0-8A46C1)
+![Version](https://img.shields.io/badge/Version-1.2.1-8A46C1)
 
 **UA:** Десктопний інструмент для одночасного надсилання сповіщень про трансляції та відео у Telegram і Discord одним кліком. Кожна платформа — джерело контенту (YouTube, Twitch) чи платформа сповіщень (Telegram, Discord) — вмикається і вимикається незалежно, будь-коли, без перезапуску програми.
 **EN:** A desktop tool for sending simultaneous stream and video notifications to Telegram and Discord in one click. Every platform — a content source (YouTube, Twitch) or a notification platform (Telegram, Discord) — can be toggled independently, anytime, without restarting the app.
@@ -131,6 +131,9 @@ The "Title" field and type (Live/Upcoming/Video/Short — the category only affe
 ---
 
 ## 📝 Історія версій / Changelog
+
+**v1.2.1**
+- **UA:** Виправлено: у вікні "📡 Надіслати сповіщення" мініатюра для Discord embed не підтягувалась, якщо відео було обране автопідбором чи зі списку кандидатів. Причина — Discord автоматично розгортає прев'ю лише для звичайного тексту з посиланням (як і Telegram), а наш Discord-сервіс відправляє структурований embed, де поле картинки завжди береться явно з даних відео, а не сканується з посилання. **EN:** Fixed: in the "📡 Send Notification" window, the Discord embed thumbnail wasn't populated when a video was chosen via auto-pick or from the candidate list. The cause — Discord only auto-unfurls a preview for plain text links (like Telegram does), while our Discord service sends a structured embed, where the image field is always taken explicitly from the video data rather than scanned from the link.
 
 **v1.2.0**
 - **UA:** Локальний кеш YouTube-контенту — заплановані трансляції не губляться, навіть якщо випадуть за межі останніх ~15 записів RSS-фіду через активну публікацію іншого контенту. **EN:** Local YouTube content cache — scheduled streams are no longer lost even if they fall outside the last ~15 RSS feed entries due to other active publishing.

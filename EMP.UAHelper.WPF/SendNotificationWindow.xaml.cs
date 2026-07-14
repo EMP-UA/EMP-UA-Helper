@@ -549,12 +549,6 @@ namespace EMP.UAHelper.WPF
             var type = Enum.Parse<VideoType>((string)((ComboBoxItem)TypeCombo.SelectedItem).Tag);
             long? scheduled = null;
 
-            // UA: Дата/час обов'язкові й підставляються в сповіщення лише для
-            //     Upcoming — для решти типів це поле лишається довідковим і
-            //     нікуди не передається
-            // EN: Date/time are required and are substituted into the
-            //     notification only for Upcoming — for other types the field
-            //     stays informational and isn't passed anywhere
             if (type == VideoType.Upcoming)
             {
                 scheduled = ParseKyivTime(DateInput.Text, TimeInput.Text);
@@ -567,12 +561,25 @@ namespace EMP.UAHelper.WPF
                 }
             }
 
+            var url = UrlInput.Text.Trim();
+
+            // UA: Розпізнаємо YouTube ID з поточного URL, щоб Discord-embed
+            //     отримав картинку — Discord, на відміну від Telegram, не тягне
+            //     прев'ю сам за посиланням, а бере його явно з ThumbnailUrl,
+            //     який будується саме з VideoId
+            // EN: Recognize the YouTube ID from the current URL so the Discord
+            //     embed gets an image — unlike Telegram, Discord doesn't fetch
+            //     a preview from the link itself; it takes it explicitly from
+            //     ThumbnailUrl, which is built from VideoId
+            var videoId = TryExtractYouTubeVideoId(url) ?? string.Empty;
+
             var video = new VideoInfo
             {
                 Title = title,
                 Type = type,
                 ScheduledStartTime = scheduled,
-                UrlOverride = string.IsNullOrWhiteSpace(UrlInput.Text) ? null : UrlInput.Text.Trim()
+                VideoId = videoId,
+                UrlOverride = string.IsNullOrWhiteSpace(url) ? null : url
             };
 
             BtnSend.IsEnabled = false;
