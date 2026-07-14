@@ -92,7 +92,7 @@ The list includes not just the last ~15 entries from the YouTube RSS feed (a You
 
 The "Title" field and type (Live/Upcoming/Video/Short — the category only affects the template and color, it's not tied to a platform) are inserted into the active templates. The "Link" field is optional: if provided, it replaces `{url}`; if left empty, template lines containing `{url}` are simply omitted. A soft warning appears if the pasted link doesn't look like YouTube or Twitch (it doesn't block sending).
 
-![UA: Надіслати сповіщення / EN: Send notification](assets/screenshots/send_dark.png)
+![UA: Надіслати сповіщення / EN: Send notification](assets/screenshots/manual_dark.png)
 
 ---
 
