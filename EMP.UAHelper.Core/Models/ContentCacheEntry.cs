@@ -1,11 +1,16 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — ContentCacheEntry.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Один запис локального кешу контенту — YouTube-відео/трансляція,
 //     побачена програмою хоча б раз, незалежно від того, чи вона й досі
 //     потрапляє в останні ~15 записів RSS-фіду
 // EN: A single local content cache entry — a YouTube video/stream the app
 //     has seen at least once, regardless of whether it's still within the
 //     RSS feed's last ~15 entries
+// =============================================================================
 using EMP.UAHelper.Core.Models;
 
 namespace EMP.UAHelper.Core.Models

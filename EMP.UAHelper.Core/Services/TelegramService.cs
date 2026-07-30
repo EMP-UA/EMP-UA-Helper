@@ -1,7 +1,12 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — TelegramService.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Сервіс для відправки сповіщень у Telegram канал
 // EN: Service for sending notifications to a Telegram channel
+// =============================================================================
 using EMP.UAHelper.Core.Models;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
@@ -16,11 +21,23 @@ namespace EMP.UAHelper.Core.Services
         private readonly string _twitchUrl;
         private readonly TemplateService _templateService;
 
-        public TelegramService(string botToken, string channelUsername, string twitchUrl, TemplateService templateService)
+        // UA: Резолвиться один раз при побудові сервісу (через AppTimeZone,
+        //     без хардкоду) — сервіс і так перестворюється при кожній зміні
+        //     налаштувань (див. ContentDispatchFactory), тож "застаріла" зона
+        //     тут неможлива
+        // EN: Resolved once when the service is built (via AppTimeZone, no
+        //     hardcoding) — the service is already recreated on every
+        //     settings change (see ContentDispatchFactory), so a "stale"
+        //     zone here isn't possible
+        private readonly TimeZoneInfo _timeZone;
+
+        public TelegramService(string botToken, string channelUsername, string twitchUrl,
+            string timeZoneId, TemplateService templateService)
         {
             _botClient = new TelegramBotClient(botToken);
             _channelUsername = channelUsername;
             _twitchUrl = twitchUrl;
+            _timeZone = AppTimeZone.Resolve(timeZoneId);
             _templateService = templateService;
         }
 
@@ -48,6 +65,7 @@ namespace EMP.UAHelper.Core.Services
                 video.Title,
                 video.Url,
                 _twitchUrl,
+                _timeZone,
                 video.ScheduledStartTime);
 
             await _botClient.SendMessage(
@@ -61,6 +79,29 @@ namespace EMP.UAHelper.Core.Services
                     PreferLargeMedia = true,
                     ShowAboveText = true
                 }
+            );
+        }
+
+        // UA: Повністю ручна відправка — без TemplateService, текст іде як є.
+        //     ParseMode.Html залишаємо увімкненим, щоб користувач міг сам
+        //     вручну вписати HTML-теги Telegram (<b>, <i>, <a href>, <code>,
+        //     <tg-spoiler> тощо) — якщо тегів немає, звичайний текст
+        //     надсилається без змін. Прев'ю посилання лишаємо на розсуд
+        //     Telegram (не примушуємо конкретний URL, як у шаблонному режимі)
+        // EN: Fully manual send — bypasses TemplateService, text goes as-is.
+        //     ParseMode.Html is kept on so the user can hand-write Telegram
+        //     HTML tags (<b>, <i>, <a href>, <code>, <tg-spoiler>, etc.) — if
+        //     no tags are present, plain text is sent unchanged. Link preview
+        //     is left to Telegram's own detection (we don't force a specific
+        //     URL like in template mode)
+        public async Task SendRawAsync(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return;
+
+            await _botClient.SendMessage(
+                chatId: _channelUsername,
+                text: text,
+                parseMode: ParseMode.Html
             );
         }
     }

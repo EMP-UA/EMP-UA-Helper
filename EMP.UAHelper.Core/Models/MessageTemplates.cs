@@ -1,7 +1,12 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — MessageTemplates.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Моделі шаблонів повідомлень для Telegram та Discord
 // EN: Message template models for Telegram and Discord
+// =============================================================================
 namespace EMP.UAHelper.Core.Models
 {
     public class PlatformTemplates

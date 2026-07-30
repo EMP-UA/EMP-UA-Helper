@@ -150,6 +150,14 @@
                        Foreground="#B8A8D0" FontSize="14" Margin="0,6,0,4"
                        TextWrapping="Wrap"/>
 
+            <!-- UA: Група — ЗАГАЛЬНЕ / EN: Group — GENERAL -->
+            <TextBlock x:Name="TxtGroupGeneral" Style="{StaticResource GroupLabel}"/>
+            <TextBlock x:Name="TxtTimezoneLabel" Style="{StaticResource SectionLabel}"/>
+            <Rectangle Height="1" Fill="#3D2B5E" Margin="0,4,0,0"/>
+            <TextBlock x:Name="TxtTimezoneHint" Style="{StaticResource FieldHint}" Margin="0,8,0,3"/>
+            <ComboBox x:Name="TimezoneCombo" Style="{StaticResource ComboField}"
+                      DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
+
             <!-- UA: Група — ДЖЕРЕЛА КОНТЕНТУ / EN: Group — CONTENT SOURCES -->
             <TextBlock x:Name="TxtGroupContent" Style="{StaticResource GroupLabel}"/>
 
@@ -266,9 +274,38 @@
                             Click="ToggleDiscordWebhook_Click"/>
                 </Grid>
 
+                <!-- UA: Назва основного каналу — суто підпис для випадаючого
+                         списку у вікні надсилання. Необов'язкова: якщо канал
+                         один, назва нікому не потрібна і поле можна лишити
+                         порожнім (тоді підставиться локалізоване "Основний канал")
+                     EN: Primary channel name — purely a label for the dropdown
+                         in the send window. Optional: with a single channel a
+                         name is pointless and the field can stay empty (the
+                         localized "Primary channel" is used then) -->
+                <TextBlock x:Name="TxtDcWebhookName" Style="{StaticResource FieldLabel}"/>
+                <TextBlock x:Name="TxtDcWebhookNameHint" Style="{StaticResource FieldHint}"/>
+                <TextBox x:Name="DiscordWebhookName" Style="{StaticResource InputField}"/>
+
                 <TextBlock x:Name="TxtDcRoleId" Style="{StaticResource FieldLabel}"/>
                 <TextBlock x:Name="TxtDcRoleIdHint" Style="{StaticResource FieldHint}"/>
                 <TextBox x:Name="DiscordRoleId" Style="{StaticResource InputField}"/>
+
+                <!-- UA: Додаткові канали. Рядки будуються з коду, а не описані
+                         тут статично, бо їх кількість довільна. Порожній список
+                         за замовчуванням: хто має один канал — навіть не
+                         помітить цього блоку, крім кнопки «додати»
+                     EN: Additional channels. Rows are built from code rather
+                         than declared statically here, because the count is
+                         arbitrary. The list is empty by default: anyone with a
+                         single channel won't notice this block beyond the
+                         "add" button -->
+                <Rectangle Height="1" Fill="#3D2B5E" Margin="0,14,0,0"/>
+                <TextBlock x:Name="TxtDcExtraChannels" Style="{StaticResource FieldLabel}"/>
+                <TextBlock x:Name="TxtDcExtraChannelsHint" Style="{StaticResource FieldHint}"/>
+                <StackPanel x:Name="PanelExtraChannels" Margin="0,4,0,0"/>
+                <Button x:Name="BtnAddChannel" Style="{StaticResource RevealButton}"
+                        HorizontalAlignment="Left" Width="Auto" Padding="12,0"
+                        Margin="0,6,0,0" Click="BtnAddChannel_Click"/>
             </StackPanel>
 
             <Button x:Name="BtnSave"

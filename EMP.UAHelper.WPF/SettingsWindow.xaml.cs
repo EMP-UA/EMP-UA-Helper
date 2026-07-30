@@ -1,11 +1,16 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — SettingsWindow.xaml.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Код вікна налаштувань — попередньо заповнене поточними значеннями,
 //     секрети замасковані за замовчуванням, застосовує зміни одразу
 //     через переданий callback
 // EN: Settings window code-behind — pre-filled with current values,
 //     secrets masked by default, applies changes immediately via the
 //     provided callback
+// =============================================================================
 using EMP.UAHelper.Core.Services;
 using System.IO;
 using System.Text.Json;
@@ -45,6 +50,19 @@ namespace EMP.UAHelper.WPF
         //     were shown unmasked last time
         private void LoadCurrentSettings(AppSettings s)
         {
+            // UA: Список зон і поточне значення — показуємо зону, яка
+            //     РЕАЛЬНО зараз використовується (через AppTimeZone.Resolve),
+            //     а не сирий s.TimeZoneId. Для старих appsettings.json без
+            //     цього поля це буде Київ — саме той фолбек, що й діє
+            //     насправді, тож користувач бачить правду, а не порожнє поле
+            // EN: Zone list and current value — we show the zone that's
+            //     ACTUALLY in effect right now (via AppTimeZone.Resolve),
+            //     not the raw s.TimeZoneId. For an old appsettings.json
+            //     without this field that's Kyiv — the same fallback that's
+            //     really in effect, so the user sees the truth, not a blank field
+            TimezoneCombo.ItemsSource = AppTimeZone.AllZones();
+            TimezoneCombo.SelectedValue = AppTimeZone.Resolve(s.TimeZoneId).Id;
+
             ChkUseTelegram.IsChecked = s.UseTelegram;
             ChkUseYoutube.IsChecked = s.UseYouTube;
             ChkUseDiscord.IsChecked = s.UseDiscord;
@@ -63,6 +81,10 @@ namespace EMP.UAHelper.WPF
             DiscordWebhookSecure.Password = webhook;
             DiscordWebhookPlain.Text = webhook;
             DiscordRoleId.Text = s.DiscordRoleId;
+            DiscordWebhookName.Text = s.DiscordWebhookName;
+
+            foreach (var extra in s.DiscordExtraWebhooks)
+                AddChannelRow(extra.Name, extra.Url);
 
             TwitchUrl.Text = string.IsNullOrEmpty(s.TwitchUrl)
                 ? "https://www.twitch.tv/" : s.TwitchUrl;
@@ -78,6 +100,9 @@ namespace EMP.UAHelper.WPF
             Title = _loc.Get("settings.title");
             TxtHeader.Text = _loc.Get("settings.header");
             TxtDescription.Text = _loc.Get("settings.description");
+            TxtGroupGeneral.Text = _loc.Get("settings.group.general");
+            TxtTimezoneLabel.Text = _loc.Get("settings.timezone.label");
+            TxtTimezoneHint.Text = _loc.Get("settings.timezone.hint");
             TxtGroupContent.Text = _loc.Get("settings.group.content");
             TxtGroupNotify.Text = _loc.Get("settings.group.notify");
             TxtSectionTelegram.Text = _loc.Get("firstrun.section.telegram");
@@ -96,6 +121,11 @@ namespace EMP.UAHelper.WPF
             TxtDcWebhookHint.Text = _loc.Get("firstrun.dc.webhook.hint");
             TxtDcRoleId.Text = _loc.Get("firstrun.dc.roleid");
             TxtDcRoleIdHint.Text = _loc.Get("firstrun.dc.roleid.hint");
+            TxtDcWebhookName.Text = _loc.Get("settings.dc.webhook_name");
+            TxtDcWebhookNameHint.Text = _loc.Get("settings.dc.webhook_name.hint");
+            TxtDcExtraChannels.Text = _loc.Get("settings.dc.extra_channels");
+            TxtDcExtraChannelsHint.Text = _loc.Get("settings.dc.extra_channels.hint");
+            BtnAddChannel.Content = _loc.Get("settings.dc.add_channel");
             TxtTwUrl.Text = _loc.Get("firstrun.tw.url");
             TxtTwUrlHint.Text = _loc.Get("firstrun.tw.url.hint");
             BtnSave.Content = _loc.Get("settings.save");
@@ -215,11 +245,14 @@ namespace EMP.UAHelper.WPF
                 TelegramBotToken = telegramToken.Trim(),
                 YoutubeApiKey = youtubeKey.Trim(),
                 DiscordWebhookUrl = discordWebhook.Trim(),
+                DiscordWebhookName = DiscordWebhookName.Text.Trim(),
+                DiscordExtraWebhooks = CollectExtraChannels(),
                 DiscordRoleId = DiscordRoleId.Text.Trim(),
                 ChannelId = YoutubeChannelId.Text.Trim(),
                 ChannelUsername = TelegramChannel.Text.Trim(),
                 TwitchUrl = TwitchUrl.Text.Trim(),
                 UiLanguage = _loc.Language.ToString().ToLower(),
+                TimeZoneId = TimezoneCombo.SelectedValue as string ?? AppTimeZone.FallbackId,
                 UseTelegram = useTelegram,
                 UseYouTube = useYoutube,
                 UseDiscord = useDiscord,
@@ -233,6 +266,98 @@ namespace EMP.UAHelper.WPF
             _onSaved(settings);
 
             Close();
+        }
+
+        // =====================================================================
+        // UA: Додаткові Discord-канали. Рядки будуються з коду, бо їх кількість
+        //     довільна — описати їх статично в XAML неможливо. Кожен рядок це
+        //     назва + URL + кнопка видалення; жодного зайвого стану не
+        //     зберігаємо, значення читаються прямо з полів при збереженні.
+        //     URL тут відкритий, а не під PasswordBox, на відміну від
+        //     основного вебхука. Це свідомо: приховане поле, яке не можна
+        //     звірити очима, при кількох схожих URL перетворює вибір каналу на
+        //     вгадування, а сам файл appsettings.json усе одно лежить у
+        //     відкритому вигляді поруч з exe — тобто приховування в UI тут
+        //     дало б відчуття захисту, а не захист.
+        // EN: Additional Discord channels. Rows are built from code because
+        //     their count is arbitrary — they can't be declared statically in
+        //     XAML. Each row is name + URL + a delete button; no extra state is
+        //     kept, values are read straight from the fields on save.
+        //     The URL here is shown in the clear rather than behind a
+        //     PasswordBox, unlike the primary webhook. That's deliberate: a
+        //     masked field you can't verify by eye turns picking between
+        //     several similar URLs into guesswork, and appsettings.json itself
+        //     sits in plain text next to the exe anyway — so masking here would
+        //     provide the feeling of protection rather than protection.
+        // =====================================================================
+        private void BtnAddChannel_Click(object sender, RoutedEventArgs e)
+            => AddChannelRow(string.Empty, string.Empty);
+
+        private void AddChannelRow(string name, string url)
+        {
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var nameBox = new TextBox
+            {
+                Text = name,
+                Style = (Style)FindResource("InputField"),
+                Tag = "name"
+            };
+            Grid.SetColumn(nameBox, 0);
+
+            var urlBox = new TextBox
+            {
+                Text = url,
+                Style = (Style)FindResource("InputField"),
+                Margin = new Thickness(6, 0, 0, 0),
+                Tag = "url"
+            };
+            Grid.SetColumn(urlBox, 1);
+
+            var removeButton = new Button
+            {
+                Content = "✕",
+                Style = (Style)FindResource("RevealButton"),
+                Margin = new Thickness(6, 0, 0, 0),
+                ToolTip = _loc.Get("settings.dc.remove_channel")
+            };
+            Grid.SetColumn(removeButton, 2);
+            removeButton.Click += (_, _) => PanelExtraChannels.Children.Remove(row);
+
+            row.Children.Add(nameBox);
+            row.Children.Add(urlBox);
+            row.Children.Add(removeButton);
+
+            PanelExtraChannels.Children.Add(row);
+        }
+
+        // UA: Рядки без URL відкидаємо мовчки — порожній рядок, який людина
+        //     додала й передумала заповнювати, не має ставати "каналом", що
+        //     нікуди не надсилає. Назва без URL сенсу не має, URL без назви —
+        //     цілком (підставиться локалізоване "Канал без назви")
+        // EN: Rows without a URL are dropped silently — an empty row the person
+        //     added and then decided against shouldn't become a "channel" that
+        //     sends nowhere. A name without a URL is meaningless; a URL without
+        //     a name is fine (the localized "Unnamed channel" is used)
+        private List<DiscordWebhookTarget> CollectExtraChannels()
+        {
+            var result = new List<DiscordWebhookTarget>();
+
+            foreach (var row in PanelExtraChannels.Children.OfType<Grid>())
+            {
+                var boxes = row.Children.OfType<TextBox>().ToList();
+                var name = boxes.FirstOrDefault(b => (b.Tag as string) == "name")?.Text.Trim() ?? string.Empty;
+                var url = boxes.FirstOrDefault(b => (b.Tag as string) == "url")?.Text.Trim() ?? string.Empty;
+
+                if (url.Length == 0) continue;
+
+                result.Add(new DiscordWebhookTarget { Name = name, Url = url });
+            }
+
+            return result;
         }
 
         protected override void OnClosed(EventArgs e)

@@ -1,7 +1,12 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — TemplateEditorWindow.xaml.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Код вікна редактора шаблонів повідомлень
 // EN: Template editor window code-behind
+// =============================================================================
 using EMP.UAHelper.Core.Models;
 using EMP.UAHelper.Core.Services;
 using System.IO;

@@ -5,5 +5,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- UA: Спільні стилі, доступні з будь-якого вікна без дублювання
+                     EN: Shared styles available from any window without duplication -->
+                <ResourceDictionary Source="Styles/DarkComboBox.xaml"/>
+                <ResourceDictionary Source="Styles/DarkCalendar.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

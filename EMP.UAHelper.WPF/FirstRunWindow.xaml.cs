@@ -1,7 +1,12 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — FirstRunWindow.xaml.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Логіка вікна першого запуску
 // EN: First run window code-behind
+// =============================================================================
 using EMP.UAHelper.Core.Services;
 using System.IO;
 using System.Text.Json;
@@ -42,6 +47,22 @@ namespace EMP.UAHelper.WPF
             ChkUseDiscord.IsChecked = true;
             ChkUseTwitch.IsChecked = true;
 
+            // UA: Заповнюємо список часових зон і одразу підставляємо
+            //     системну зону як початкове значення за замовчуванням —
+            //     нікому не доведеться нічого вирішувати, якщо їх влаштовує
+            //     їхня власна зона. Значення зберігається явно в
+            //     appsettings.json з моменту збереження — і більше не
+            //     змінюється саме собою, навіть якщо системна зона
+            //     комп'ютера пізніше зміниться
+            // EN: Populate the timezone list and pre-select the system's own
+            //     zone as the initial default value — nobody has to decide
+            //     anything if their own zone works for them. The value is
+            //     saved explicitly into appsettings.json from that point on
+            //     — and never changes by itself again, even if the
+            //     machine's system zone changes later
+            TimezoneCombo.ItemsSource = AppTimeZone.AllZones();
+            TimezoneCombo.SelectedValue = AppTimeZone.DetectSystemId();
+
             _loc = loc;
             _loc.LanguageChanged += ApplyLocalization;
             ApplyLocalization();
@@ -52,6 +73,9 @@ namespace EMP.UAHelper.WPF
             Title = _loc.Get("firstrun.title");
             TxtWelcome.Text = _loc.Get("firstrun.welcome");
             TxtDescription.Text = _loc.Get("firstrun.description");
+            TxtGroupGeneral.Text = _loc.Get("settings.group.general");
+            TxtTimezoneLabel.Text = _loc.Get("settings.timezone.label");
+            TxtTimezoneHint.Text = _loc.Get("settings.timezone.hint");
             TxtGroupContent.Text = _loc.Get("settings.group.content");
             TxtGroupNotify.Text = _loc.Get("settings.group.notify");
             TxtSectionTelegram.Text = _loc.Get("firstrun.section.telegram");
@@ -210,6 +234,7 @@ namespace EMP.UAHelper.WPF
                 ChannelUsername = TelegramChannel.Text.Trim(),
                 TwitchUrl = TwitchUrl.Text.Trim(),
                 UiLanguage = _loc.Language.ToString().ToLower(),
+                TimeZoneId = TimezoneCombo.SelectedValue as string ?? AppTimeZone.FallbackId,
                 UseTelegram = useTelegram,
                 UseYouTube = useYoutube,
                 UseDiscord = useDiscord,

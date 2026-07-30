@@ -155,100 +155,31 @@
             </Setter>
         </Style>
 
-        <Style x:Key="ComboItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="#1A1425"/>
-            <Setter Property="Foreground" Value="#E8E0F0"/>
-            <Setter Property="Padding" Value="10,8"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="ItemBorder"
-                                Background="{TemplateBinding Background}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#3D2B5E"/>
-                                <Setter Property="Foreground" Value="#C989F3"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#3D2B5E"/>
-                                <Setter Property="Foreground" Value="#C989F3"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <!-- UA: ComboItemStyle, ComboField і DarkCalendar тепер у спільному
+                 App.xaml → Styles/DarkComboBox.xaml, Styles/DarkCalendar.xaml
+                 (не дублюємо тут)
+             EN: ComboItemStyle, ComboField and DarkCalendar now live in the
+                 shared App.xaml → Styles/DarkComboBox.xaml,
+                 Styles/DarkCalendar.xaml (not duplicated here) -->
 
-        <Style x:Key="ComboField" TargetType="ComboBox">
+        <!-- UA: Компактна квадратна кнопка-іконка — для пікерів дати/часу
+                 (📅/🕐) і кнопок "зараз" (⏱) біля полів дати/часу
+             EN: Compact square icon button — for the date/time pickers
+                 (📅/🕐) and the "now" buttons (⏱) next to date/time fields -->
+        <Style x:Key="IconButton" TargetType="Button">
             <Setter Property="Background" Value="#1A1425"/>
-            <Setter Property="Foreground" Value="#E8E0F0"/>
+            <Setter Property="Foreground" Value="#C989F3"/>
             <Setter Property="BorderBrush" Value="#3D2B5E"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Width" Value="42"/>
             <Setter Property="Height" Value="38"/>
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="ItemContainerStyle" Value="{StaticResource ComboItemStyle}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBox">
-                        <Grid>
-                            <ToggleButton x:Name="ToggleButton"
-                                          Background="Transparent"
-                                          BorderThickness="0"
-                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                                          ClickMode="Press"
-                                          Panel.ZIndex="1">
-                                <ToggleButton.Template>
-                                    <ControlTemplate TargetType="ToggleButton">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=ComboBox}}"
-                                                BorderThickness="{Binding BorderThickness, RelativeSource={RelativeSource AncestorType=ComboBox}}">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="28"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Path Grid.Column="1"
-                                                      Data="M0,0 L4,4 L8,0 Z" Fill="#C989F3"
-                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Grid>
-                                        </Border>
-                                    </ControlTemplate>
-                                </ToggleButton.Template>
-                            </ToggleButton>
-
-                            <ContentPresenter x:Name="ContentSite"
-                                               Margin="{TemplateBinding Padding}"
-                                               VerticalAlignment="Center"
-                                               HorizontalAlignment="Left"
-                                               IsHitTestVisible="False"
-                                               Content="{TemplateBinding SelectionBoxItem}"
-                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
-
-                            <Popup x:Name="Popup"
-                                   Placement="Bottom"
-                                   IsOpen="{TemplateBinding IsDropDownOpen}"
-                                   AllowsTransparency="True"
-                                   Focusable="False"
-                                   PopupAnimation="Slide">
-                                <Border Background="#1A1425"
-                                        BorderBrush="#8A46C1"
-                                        BorderThickness="1"
-                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ComboBox}}"
-                                        MaxHeight="220">
-                                    <ScrollViewer Margin="2" SnapsToDevicePixels="True">
-                                        <ItemsPresenter/>
-                                    </ScrollViewer>
-                                </Border>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3D2B5E"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
     </Window.Resources>
 
@@ -282,6 +213,54 @@
             <TextBlock x:Name="TxtDescription"
                        Foreground="#B8A8D0" FontSize="13" Margin="0,6,0,0"
                        TextWrapping="Wrap"/>
+
+            <!-- UA: Перемикач повністю ручного режиму — вимикає будь-яку
+                     підстановку шаблону, відправляється рівно те, що введено
+                     в полях нижче, окремо для кожної платформи
+                 EN: Fully manual mode toggle — disables all template
+                     substitution, sends exactly what was typed in the fields
+                     below, separately per platform -->
+            <CheckBox x:Name="ChkRawMode" Style="{StaticResource AutoCheckBox}"
+                      Checked="ChkRawMode_Changed" Unchecked="ChkRawMode_Changed"/>
+            <TextBlock x:Name="TxtRawModeHint" Style="{StaticResource FieldHint}"/>
+
+            <!-- UA: Вибір Discord-каналу. Увесь блок існує лише якщо в
+                     налаштуваннях заведено більше одного каналу — при одному
+                     каналі вікно виглядає точно як раніше, тобто наявним
+                     користувачам нічого не додається "просто так".
+                     Типово надсилаємо в основний канал: галочка потрібна саме
+                     щоб змінити канал була свідома дія, а не випадковий клік
+                     по списку, який відправить анонс не туди. Список
+                     з'являється тільки після зняття цієї галочки.
+                     Блок спільний для обох режимів (шаблонного і ручного) —
+                     стоїть до їх розділення, бо канал це властивість
+                     відправки, а не режиму
+                 EN: Discord channel picker. The whole block only exists when
+                     more than one channel is configured — with a single channel
+                     the window looks exactly as before, i.e. nothing is added
+                     "just because" for existing users.
+                     The primary channel is the default: the checkbox exists so
+                     that changing the channel is a deliberate act, not a stray
+                     click in a list that sends the announcement to the wrong
+                     place. The list appears only once the box is ticked.
+                     The block is shared by both modes (template and manual) —
+                     it sits before they split, because the channel is a
+                     property of the send, not of the mode -->
+            <StackPanel x:Name="PanelChannelPicker" Visibility="Collapsed" Margin="0,8,0,0">
+                <CheckBox x:Name="ChkOverrideChannel" Style="{StaticResource AutoCheckBox}"
+                          Checked="ChkOverrideChannel_Changed" Unchecked="ChkOverrideChannel_Changed"/>
+                <ComboBox x:Name="ChannelCombo" Visibility="Collapsed" Margin="0,6,0,0"
+                          Style="{StaticResource ComboField}"
+                          ItemContainerStyle="{StaticResource ComboItemStyle}"
+                          DisplayMemberPath="Name" SelectedValuePath="Url"/>
+                <TextBlock x:Name="TxtChannelHint" Style="{StaticResource FieldHint}"/>
+            </StackPanel>
+
+            <Rectangle Height="1" Fill="#3D2B5E" Margin="0,12,0,0"/>
+
+            <!-- UA: Режим за шаблоном — приклад, автопідбір, поля заголовка/типу/URL/дати
+                 EN: Template mode — preview, auto-pick, title/type/url/date fields -->
+            <StackPanel x:Name="PanelTemplateMode">
 
             <!-- UA: Чекбокс автопідбору — видимий лише якщо YouTube увімкнено
                  EN: Auto-pick checkbox — visible only if YouTube is enabled -->
@@ -319,6 +298,60 @@
                  EN: Shown only if no notification platform is enabled -->
             <TextBlock x:Name="TxtPreviewEmpty" Style="{StaticResource FieldHint}" Visibility="Collapsed"/>
 
+            <!-- UA: Банер статусу завантаження списку з YouTube. Свідомо ЗЗОВНІ
+                     PanelPickerRow: той рядок ховається при увімкненому
+                     автопідборі, і повідомлення про помилку разом з ним ставало
+                     невидимим саме в найпоширенішому сценарії — вікно виглядало
+                     просто порожнім, без жодного пояснення чому.
+                     Кольори фону/рамки й іконка призначаються з code-behind
+                     (нейтральні для "завантаження", жовті для "показано з кешу",
+                     червоні для повного провалу) — щоб не плодити три майже
+                     однакові розмітки під кожен стан.
+                 EN: YouTube list loading status banner. Deliberately OUTSIDE
+                     PanelPickerRow: that row is hidden while auto-pick is on, so
+                     the error message used to become invisible in exactly the
+                     most common scenario — the window just looked empty with no
+                     explanation why.
+                     Background/border colors and the icon are assigned from
+                     code-behind (neutral for "loading", amber for "served from
+                     cache", red for a total failure) — to avoid three nearly
+                     identical markup blocks, one per state. -->
+            <Border x:Name="PanelPickerStatus" Visibility="Collapsed"
+                    BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="TxtPickerStatusIcon" Grid.Column="0"
+                               FontSize="14" Margin="0,0,8,0" VerticalAlignment="Top"/>
+
+                    <TextBlock x:Name="TxtPickerStatus" Grid.Column="1"
+                               TextWrapping="Wrap" VerticalAlignment="Center"/>
+
+                    <!-- UA: Повтор запиту без перезапуску програми — при
+                         тимчасовому збої мережі не треба закривати вікно.
+                         Поруч — запасний шлях через API, який з'являється
+                         тільки після виявленої помилки і питає підтвердження,
+                         бо витрачає добову квоту (безкоштовний RSS її не чіпає)
+                         EN: Retry without restarting the app — a transient
+                         network glitch shouldn't require closing the window.
+                         Next to it, the API fallback, which only appears after
+                         a detected error and asks for confirmation, because it
+                         spends the daily quota (the free RSS feed doesn't) -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                        <Button x:Name="BtnRetryLoad" Content="↻"
+                                Style="{StaticResource IconButton}"
+                                Visibility="Collapsed" Click="BtnRetryLoad_Click"/>
+                        <Button x:Name="BtnApiFallback" Content="🔑"
+                                Style="{StaticResource IconButton}" Margin="6,0,0,0"
+                                Visibility="Collapsed" Click="BtnApiFallback_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
             <!-- UA: Рядок-перемикач списку кандидатів — з'являється лише коли
                      автопідбір знятий
                  EN: Candidate list toggle row — appears only when auto-pick is off -->
@@ -326,7 +359,6 @@
                 <Button x:Name="BtnTogglePicker" Style="{StaticResource PickerToggleButton}"
                         Click="BtnTogglePicker_Click"/>
                 <TextBlock x:Name="TxtPickerHint" Style="{StaticResource FieldHint}"/>
-                <TextBlock x:Name="TxtPickerStatus" Style="{StaticResource FieldHint}" Visibility="Collapsed"/>
 
                 <Border x:Name="PanelPickerList" Visibility="Collapsed" Margin="0,4,0,0"
                         BorderBrush="#3D2B5E" BorderThickness="1">
@@ -385,17 +417,254 @@
                      changes depending on type (required for Upcoming,
                      informational for the rest) -->
             <TextBlock x:Name="TxtDateLabel" Style="{StaticResource FieldLabel}"/>
-            <TextBox x:Name="DateInput" Style="{StaticResource InputField}"
-                     TextChanged="Field_TextChanged"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="DateInput" Grid.Column="0" Style="{StaticResource InputField}"
+                         TextChanged="Field_TextChanged"/>
+                <Button x:Name="BtnPickDate" Grid.Column="1" Content="📅"
+                        Style="{StaticResource IconButton}" Margin="6,0,0,0" Click="BtnPickDate_Click"/>
+                <Button x:Name="BtnDateNow" Grid.Column="2" Content="⏱"
+                        Style="{StaticResource IconButton}" Margin="6,0,0,0" Click="BtnDateNow_Click"/>
+            </Grid>
 
             <TextBlock x:Name="TxtTimeLabel" Style="{StaticResource FieldLabel}"/>
-            <TextBox x:Name="TimeInput" Style="{StaticResource InputField}"
-                     TextChanged="Field_TextChanged"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="TimeInput" Grid.Column="0" Style="{StaticResource InputField}"
+                         TextChanged="Field_TextChanged"/>
+                <Button x:Name="BtnPickTime" Grid.Column="1" Content="🕐"
+                        Style="{StaticResource IconButton}" Margin="6,0,0,0" Click="BtnPickTime_Click"/>
+                <Button x:Name="BtnTimeNow" Grid.Column="2" Content="⏱"
+                        Style="{StaticResource IconButton}" Margin="6,0,0,0" Click="BtnTimeNow_Click"/>
+            </Grid>
+
+            </StackPanel>
+
+            <!-- UA: Повністю ручний режим — жодного шаблону, окремі поля для
+                     Telegram і Discord, бо теги/форматування платформозалежні
+                 EN: Fully manual mode — no template at all, separate fields
+                     for Telegram and Discord, since tags/formatting are
+                     platform-specific -->
+            <StackPanel x:Name="PanelRawMode" Visibility="Collapsed">
+
+                <!-- UA: Опціональна дата/час трансляції (у зоні з "⚙️ Налаштування")
+                         — спільна для обох платформ, лише генерує позначки
+                         часу нижче. Нічого нікуди автоматично не підставляється
+                         — це суперечило б суті ручного режиму
+                     EN: Optional stream date/time (in the zone set under
+                         "⚙️ Settings") — shared for both platforms, only
+                         generates the timestamp snippets below. Nothing is
+                         auto-inserted anywhere — that would defeat the point
+                         of manual mode -->
+                <TextBlock x:Name="TxtRawDateLabel" Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="RawDateInput" Grid.Column="0" Style="{StaticResource InputField}"
+                             TextChanged="RawScheduled_TextChanged"/>
+                    <Button x:Name="BtnPickDateRaw" Grid.Column="1" Content="📅"
+                            Style="{StaticResource IconButton}" Margin="6,0,0,0" Click="BtnPickDateRaw_Click"/>
+                    <Button x:Name="BtnDateNowRaw" Grid.Column="2" Content="⏱"
+                            Style="{StaticResource IconButton}" Margin="6,0,0,0" Click="BtnDateNowRaw_Click"/>
+                </Grid>
+
+                <TextBlock x:Name="TxtRawTimeLabel" Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="RawTimeInput" Grid.Column="0" Style="{StaticResource InputField}"
+                             TextChanged="RawScheduled_TextChanged"/>
+                    <Button x:Name="BtnPickTimeRaw" Grid.Column="1" Content="🕐"
+                            Style="{StaticResource IconButton}" Margin="6,0,0,0" Click="BtnPickTimeRaw_Click"/>
+                    <Button x:Name="BtnTimeNowRaw" Grid.Column="2" Content="⏱"
+                            Style="{StaticResource IconButton}" Margin="6,0,0,0" Click="BtnTimeNowRaw_Click"/>
+                </Grid>
+                <TextBlock x:Name="TxtRawScheduledHint" Style="{StaticResource FieldHint}"/>
+
+                <StackPanel x:Name="PanelRawTelegram">
+                    <TextBlock x:Name="TxtRawTelegramLabel" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="RawTelegramInput" Style="{StaticResource InputField}"
+                             Height="140" TextWrapping="Wrap" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"/>
+                    <TextBlock x:Name="TxtRawTelegramHint" Style="{StaticResource FieldHint}"/>
+
+                    <!-- UA: Згенерована позначка часу для Telegram — з'являється
+                             лише коли дата/час коректні. Читається, копіюється
+                             (виділенням чи кнопкою) і вручну вставляється в
+                             текст вище, де потрібно
+                         EN: Generated Telegram timestamp — appears only once
+                             the date/time are valid. Read-only, copyable (by
+                             selection or the button) and manually pasted into
+                             the text above wherever needed -->
+                    <StackPanel x:Name="PanelRawTelegramSnippet" Visibility="Collapsed" Margin="0,8,0,0">
+                        <TextBlock x:Name="TxtRawTelegramSnippetLabel" Style="{StaticResource PlatformPreviewLabel}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="RawTelegramSnippetBox" Grid.Column="0"
+                                     Style="{StaticResource InputField}" IsReadOnly="True"/>
+                            <Button x:Name="BtnCopyTelegramSnippet" Grid.Column="1"
+                                    Content="📋" Style="{StaticResource LangButton}"
+                                    Margin="6,0,0,0" Click="BtnCopyTelegramSnippet_Click"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="PanelRawDiscord">
+                    <TextBlock x:Name="TxtRawDiscordLabel" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="RawDiscordInput" Style="{StaticResource InputField}"
+                             Height="140" TextWrapping="Wrap" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto"/>
+                    <TextBlock x:Name="TxtRawDiscordHint" Style="{StaticResource FieldHint}"/>
+
+                    <!-- UA: Те саме для Discord — тег <t:...:F> (<t:...:R>),
+                             який Discord сам рендерить у локальному часі читача
+                         EN: Same for Discord — the <t:...:F> (<t:...:R>) tag,
+                             which Discord renders in the reader's own local time -->
+                    <StackPanel x:Name="PanelRawDiscordSnippet" Visibility="Collapsed" Margin="0,8,0,0">
+                        <TextBlock x:Name="TxtRawDiscordSnippetLabel" Style="{StaticResource PlatformPreviewLabel}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="RawDiscordSnippetBox" Grid.Column="0"
+                                     Style="{StaticResource InputField}" IsReadOnly="True"/>
+                            <Button x:Name="BtnCopyDiscordSnippet" Grid.Column="1"
+                                    Content="📋" Style="{StaticResource LangButton}"
+                                    Margin="6,0,0,0" Click="BtnCopyDiscordSnippet_Click"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- UA: Генератор тегу згадки — за тим самим принципом, що й
+                             позначка часу вище: вводиш лише ID, отримуєш готовий
+                             код, який копіюєш і вставляєш куди треба. Нічого
+                             автоматично в текст не підставляється, бо це
+                             суперечило б суті ручного режиму.
+                             Тип згадки обирається списком, бо синтаксис у
+                             Discord різний: роль <@&ID>, користувач <@ID>,
+                             канал <#ID> — переплутати їх легко, а помилка
+                             видима вже після надсилання
+                         EN: Mention tag generator — same principle as the
+                             timestamp above: you enter just the ID and get the
+                             finished code to copy and paste wherever needed.
+                             Nothing is auto-inserted into the text, as that
+                             would defeat the point of manual mode.
+                             The mention type is picked from a list because
+                             Discord's syntax differs: role <@&ID>, user <@ID>,
+                             channel <#ID> — easy to mix up, and the mistake is
+                             only visible after sending -->
+                    <StackPanel Margin="0,8,0,0">
+                        <TextBlock x:Name="TxtRawMentionLabel" Style="{StaticResource FieldLabel}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="MentionTypeCombo" Grid.Column="0" Width="150"
+                                      Style="{StaticResource ComboField}"
+                                      ItemContainerStyle="{StaticResource ComboItemStyle}"
+                                      SelectionChanged="MentionType_SelectionChanged">
+                                <ComboBoxItem x:Name="ItemMentionRole" Tag="role"/>
+                                <ComboBoxItem x:Name="ItemMentionUser" Tag="user"/>
+                                <ComboBoxItem x:Name="ItemMentionChannel" Tag="channel"/>
+                            </ComboBox>
+                            <TextBox x:Name="RawMentionIdInput" Grid.Column="1"
+                                     Style="{StaticResource InputField}" Margin="6,0,0,0"
+                                     TextChanged="MentionId_TextChanged"/>
+                        </Grid>
+                        <TextBlock x:Name="TxtRawMentionHint" Style="{StaticResource FieldHint}"/>
+
+                        <StackPanel x:Name="PanelRawMentionSnippet" Visibility="Collapsed" Margin="0,6,0,0">
+                            <TextBlock x:Name="TxtRawMentionSnippetLabel" Style="{StaticResource PlatformPreviewLabel}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="RawMentionSnippetBox" Grid.Column="0"
+                                         Style="{StaticResource InputField}" IsReadOnly="True"/>
+                                <Button x:Name="BtnCopyMentionSnippet" Grid.Column="1"
+                                        Content="📋" Style="{StaticResource LangButton}"
+                                        Margin="6,0,0,0" Click="BtnCopyMentionSnippet_Click"/>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock x:Name="TxtRawEmpty" Style="{StaticResource FieldHint}" Visibility="Collapsed"/>
+
+            </StackPanel>
 
             <Button x:Name="BtnSend"
                     Style="{StaticResource EmpButton}"
                     Margin="0,24,0,0" HorizontalAlignment="Right"
                     Click="BtnSend_Click"/>
+
+            <!-- UA: Спільні спливні пікери дати/часу — по одному на все вікно,
+                     використовуються всіма 4 полями дати/часу (шаблонний і
+                     ручний режими). Перед відкриттям код-behind перепризначає
+                     PlacementTarget і "цільове" текстове поле, куди піде
+                     результат вибору
+                 EN: Shared floating date/time pickers — one of each for the
+                     whole window, reused by all 4 date/time fields (template
+                     and manual modes). Before opening, the code-behind
+                     reassigns PlacementTarget and the "target" text field the
+                     picked value goes into -->
+            <Popup x:Name="DatePickerPopup" Placement="Bottom" AllowsTransparency="True"
+                   StaysOpen="False" PopupAnimation="Slide">
+                <Border Background="#1A1425" BorderBrush="#8A46C1" BorderThickness="1" Padding="4">
+                    <Calendar x:Name="DatePickerCalendar" Style="{StaticResource DarkCalendar}"
+                              SelectedDatesChanged="DatePickerCalendar_SelectedDatesChanged">
+                        <!-- UA: Неявні (без x:Key) стилі для Button/TextBlock — застосовуються
+                             лише в межах цього Calendar (шапка місяць/рік, стрілки навігації),
+                             а не по всьому вікну. Значення кольору беруться зі спільного
+                             DarkCalendar.xaml, щоб не дублювати хардкод. Причина, чому це не
+                             задано просто в стилі DarkCalendar — Setter Property="Resources" у
+                             Style неможливий (Resources — не DependencyProperty).
+                             EN: Implicit (no x:Key) Button/TextBlock styles — apply only within
+                             this Calendar (month/year header, navigation arrows), not window-wide.
+                             Color values come from the shared DarkCalendar.xaml to avoid
+                             duplicating the hardcoded hex. Reason this isn't set on the DarkCalendar
+                             style itself — Setter Property="Resources" is impossible in a Style
+                             (Resources isn't a DependencyProperty). -->
+                        <Calendar.Resources>
+                            <Style TargetType="Button" BasedOn="{StaticResource DarkCalendarNavButtonStyle}"/>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource DarkCalendarNavTextStyle}"/>
+                        </Calendar.Resources>
+                    </Calendar>
+                </Border>
+            </Popup>
+
+            <Popup x:Name="TimePickerPopup" Placement="Bottom" AllowsTransparency="True"
+                   StaysOpen="False" PopupAnimation="Slide">
+                <Border Background="#1A1425" BorderBrush="#8A46C1" BorderThickness="1" Padding="10">
+                    <StackPanel Orientation="Horizontal">
+                        <ComboBox x:Name="HourCombo" Style="{StaticResource ComboField}" Width="70"/>
+                        <TextBlock Text=":" Foreground="#E8E0F0" FontSize="20" FontWeight="Bold"
+                                   VerticalAlignment="Center" Margin="8,0"/>
+                        <ComboBox x:Name="MinuteCombo" Style="{StaticResource ComboField}" Width="70"/>
+                        <Button x:Name="BtnApplyTime" Content="✓" Style="{StaticResource IconButton}"
+                                Margin="10,0,0,0" Click="BtnApplyTime_Click"/>
+                    </StackPanel>
+                </Border>
+            </Popup>
         </StackPanel>
     </ScrollViewer>
 </Window>

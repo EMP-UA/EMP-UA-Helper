@@ -1,5 +1,12 @@
-// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+// =============================================================================
+// EMP UA Helper — AssemblyInfo.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
+// UA: Метадані збірки WPF — розташування словників тем за замовчуванням
+// EN: WPF assembly metadata — default theme dictionary locations
+// =============================================================================
 using System.Windows;
 
 [assembly: ThemeInfo(

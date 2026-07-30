@@ -1,7 +1,12 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — VideoInfo.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Модель що описує відео/трансляцію — з YouTube API або введену вручну
 // EN: Model describing a video/stream — from the YouTube API or entered manually
+// =============================================================================
 namespace EMP.UAHelper.Core.Models
 {
     // UA: Тип контенту на каналі

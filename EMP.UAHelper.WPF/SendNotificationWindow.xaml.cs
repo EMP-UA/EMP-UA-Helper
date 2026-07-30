@@ -1,9 +1,16 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — SendNotificationWindow.xaml.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Код вікна надсилання сповіщення — приклади для обох платформ,
-//     мініатюра, м'яке попередження про нерозпізнане посилання
+//     мініатюра, м'яке попередження про нерозпізнане посилання, а також
+//     повністю ручний режим без шаблону (окремо Telegram/Discord)
 // EN: Send-notification window code-behind — previews for both platforms,
-//     thumbnail, soft warning for unrecognized links
+//     thumbnail, soft warning for unrecognized links, and a fully manual
+//     no-template mode (separate Telegram/Discord fields)
+// =============================================================================
 using EMP.UAHelper.Core.Models;
 using EMP.UAHelper.Core.Services;
 using System.Globalization;
@@ -13,7 +20,18 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+// UA: Проєкт одночасно підключає WPF і WinForms (для іконки в треї) — тому
+//     TextBox/Button існують в обох просторах імен і компілятор не може сам
+//     вибрати, який мається на увазі. Явно фіксуємо WPF-варіант, як і в
+//     SettingsWindow.xaml.cs/FirstRunWindow.xaml.cs.
+// EN: The project references both WPF and WinForms (for the tray icon), so
+//     TextBox/Button exist in both namespaces and the compiler can't pick one
+//     on its own. Pin the WPF variant explicitly, matching the convention
+//     already used in SettingsWindow.xaml.cs/FirstRunWindow.xaml.cs.
+using TextBox = System.Windows.Controls.TextBox;
+using Button = System.Windows.Controls.Button;
 using Color = System.Windows.Media.Color;
+using ColorConverter = System.Windows.Media.ColorConverter;
 
 namespace EMP.UAHelper.WPF
 {
@@ -27,6 +45,14 @@ namespace EMP.UAHelper.WPF
 
         private List<ContentCacheEntry> _candidates = new();
         private bool _isReady;
+
+        // UA: Яке текстове поле зараз "слухає" спільний піквер дати/часу —
+        //     призначається перед відкриттям відповідного Popup
+        // EN: Which text field the shared date/time picker is currently
+        //     "listening" for — assigned right before opening the
+        //     corresponding Popup
+        private TextBox? _dateTarget;
+        private TextBox? _timeTarget;
 
         private class CandidateItem
         {
@@ -64,7 +90,25 @@ namespace EMP.UAHelper.WPF
             TxtPreviewEmpty.Visibility = (!_settings.UseTelegram && !_settings.UseDiscord)
                 ? Visibility.Visible : Visibility.Collapsed;
 
+            // UA: Ті самі правила видимості платформ — для полів повністю
+            //     ручного режиму
+            // EN: Same platform-visibility rules — for the fully manual
+            //     mode fields
+            PanelRawTelegram.Visibility = _settings.UseTelegram ? Visibility.Visible : Visibility.Collapsed;
+            PanelRawDiscord.Visibility = _settings.UseDiscord ? Visibility.Visible : Visibility.Collapsed;
+            TxtRawEmpty.Visibility = (!_settings.UseTelegram && !_settings.UseDiscord)
+                ? Visibility.Visible : Visibility.Collapsed;
+
             TypeCombo.SelectedIndex = 0;
+
+            // UA: Списки годин/хвилин для спливного пікера часу — 00-23 і
+            //     00-59, один раз при побудові вікна
+            // EN: Hour/minute lists for the time picker popup — 00-23 and
+            //     00-59, built once when the window is constructed
+            HourCombo.ItemsSource = Enumerable.Range(0, 24).Select(h => h.ToString("00")).ToList();
+            MinuteCombo.ItemsSource = Enumerable.Range(0, 60).Select(m => m.ToString("00")).ToList();
+
+            MentionTypeCombo.SelectedIndex = 0;
 
             if (_youTubeService != null)
             {
@@ -100,6 +144,38 @@ namespace EMP.UAHelper.WPF
             TxtThumbnailNote.Text = _loc.Get("send.thumbnail.twitch_note");
             BtnSend.Content = _loc.Get("send.button");
 
+            ChkRawMode.Content = _loc.Get("send.raw.toggle");
+            TxtRawModeHint.Text = _loc.Get("send.raw.hint");
+            TxtRawTelegramLabel.Text = _loc.Get("send.raw.telegram_label");
+            TxtRawTelegramHint.Text = _loc.Get("send.raw.telegram_hint");
+            TxtRawDiscordLabel.Text = _loc.Get("send.raw.discord_label");
+            TxtRawDiscordHint.Text = _loc.Get("send.raw.discord_hint");
+            TxtRawEmpty.Text = _loc.Get("send.raw.empty_platforms");
+
+            TxtRawDateLabel.Text = _loc.Get("send.raw.scheduled.date_label");
+            TxtRawTimeLabel.Text = string.Format(_loc.Get("send.raw.scheduled.time_label"), ZoneLabel());
+            TxtRawScheduledHint.Text = _loc.Get("send.raw.scheduled.hint");
+            TxtRawTelegramSnippetLabel.Text = _loc.Get("send.raw.scheduled.telegram_snippet");
+            TxtRawDiscordSnippetLabel.Text = _loc.Get("send.raw.scheduled.discord_snippet");
+
+            TxtRawMentionLabel.Text = _loc.Get("send.raw.mention.label");
+            TxtRawMentionHint.Text = _loc.Get("send.raw.mention.hint");
+            TxtRawMentionSnippetLabel.Text = _loc.Get("send.raw.mention.snippet");
+            ItemMentionRole.Content = _loc.Get("send.raw.mention.role");
+            ItemMentionUser.Content = _loc.Get("send.raw.mention.user");
+            ItemMentionChannel.Content = _loc.Get("send.raw.mention.channel");
+
+            ChkOverrideChannel.Content = _loc.Get("send.channel.override");
+            TxtChannelHint.Text = _loc.Get("send.channel.hint");
+
+            // UA: Список каналів перебудовується саме тут, а не в конструкторі:
+            //     підписи безіменних каналів локалізовані, тож при перемиканні
+            //     мови вони мають змінитись разом з рештою інтерфейсу
+            // EN: The channel list is rebuilt here rather than in the
+            //     constructor: labels for unnamed channels are localized, so
+            //     they must change along with the rest of the UI on switch
+            BuildChannelList();
+
             ItemLive.Content = _loc.Get("type.live");
             ItemUpcoming.Content = _loc.Get("type.upcoming");
             ItemVideo.Content = _loc.Get("type.video");
@@ -124,28 +200,464 @@ namespace EMP.UAHelper.WPF
         private void BtnEN_Click(object sender, RoutedEventArgs e)
             => _loc.SetLanguage(UiLanguage.EN);
 
+        // UA: Перемикач повністю ручного режиму — приховує весь шаблонний
+        //     блок (приклад, автопідбір, заголовок/тип/URL/дата) і показує
+        //     сирі текстові поля окремо для Telegram і Discord
+        // EN: Fully manual mode toggle — hides the entire template block
+        //     (preview, auto-pick, title/type/url/date) and shows raw text
+        //     fields separately for Telegram and Discord
+        private void ChkRawMode_Changed(object sender, RoutedEventArgs e)
+        {
+            bool raw = ChkRawMode.IsChecked == true;
+            PanelTemplateMode.Visibility = raw ? Visibility.Collapsed : Visibility.Visible;
+            PanelRawMode.Visibility = raw ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // UA: Опціональна дата/час для ручного режиму — лише генерує готові
+        //     до вставки позначки часу (Telegram-рядок, Discord-тег), нічого
+        //     не підставляє в текстові поля автоматично. Некоректна або
+        //     порожня дата/час — блоки позначок просто ховаються, без помилки,
+        //     бо поле необов'язкове
+        // EN: Optional date/time for manual mode — only generates ready-to-
+        //     paste timestamp snippets (Telegram string, Discord tag), never
+        //     auto-inserts anything into the text fields. An invalid or
+        //     empty date/time just hides the snippet blocks, no error, since
+        //     the field is optional
+        private void RawScheduled_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (RawTelegramSnippetBox == null || RawDiscordSnippetBox == null) return;
+
+            var unix = ParseLocalTime(RawDateInput.Text, RawTimeInput.Text);
+            if (unix.HasValue)
+            {
+                var timeZone = AppTimeZone.Resolve(_settings.TimeZoneId);
+                RawTelegramSnippetBox.Text = TemplateService.FormatScheduledTelegram(unix.Value, timeZone);
+                RawDiscordSnippetBox.Text = TemplateService.FormatScheduledDiscordSnippet(unix.Value);
+                PanelRawTelegramSnippet.Visibility = _settings.UseTelegram ? Visibility.Visible : Visibility.Collapsed;
+                PanelRawDiscordSnippet.Visibility = _settings.UseDiscord ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else
+            {
+                PanelRawTelegramSnippet.Visibility = Visibility.Collapsed;
+                PanelRawDiscordSnippet.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void BtnCopyTelegramSnippet_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(RawTelegramSnippetBox.Text))
+                System.Windows.Clipboard.SetText(RawTelegramSnippetBox.Text);
+        }
+
+        private void BtnCopyDiscordSnippet_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(RawDiscordSnippetBox.Text))
+                System.Windows.Clipboard.SetText(RawDiscordSnippetBox.Text);
+        }
+
+        // =====================================================================
+        // UA: Генератор тегу згадки — той самий принцип, що й у позначок часу
+        //     вище: вводиться лише ID, генерується готовий код, який людина
+        //     копіює й вставляє куди хоче. Автоматично в текст нічого не
+        //     потрапляє, бо в ручному режимі відправляється рівно те, що
+        //     набрано, і будь-яка "допомога" тут була б сюрпризом.
+        // EN: Mention tag generator — the same principle as the timestamps
+        //     above: only the ID is entered, the finished code is generated for
+        //     the person to copy and paste wherever they want. Nothing lands in
+        //     the text automatically, because manual mode sends exactly what
+        //     was typed, and any "help" here would be a surprise.
+        // =====================================================================
+        //     Два окремих обробники з точними підписами замість одного спільного
+        //     з RoutedEventArgs: формально C# дозволив би один метод (параметри
+        //     делегата контраваріантні), але WPF генерує підписку в
+        //     .g.cs-коді, і покладатись тут на тонкість правил перетворення
+        //     груп методів заради економії трьох рядків — погана угода.
+        //     Two separate handlers with exact signatures instead of one shared
+        //     RoutedEventArgs handler: C# would formally allow a single method
+        //     (delegate parameters are contravariant), but WPF generates the
+        //     subscription in .g.cs code, and relying on a subtlety of method
+        //     group conversion rules to save three lines is a bad trade.
+        private void MentionType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+            => UpdateMentionSnippet();
+
+        private void MentionId_TextChanged(object sender, TextChangedEventArgs e)
+            => UpdateMentionSnippet();
+
+        private void UpdateMentionSnippet()
+        {
+            // UA: SelectionChanged комбобокса спрацьовує ще під час
+            //     InitializeComponent, коли решта полів ще не створена
+            // EN: The combo's SelectionChanged fires during InitializeComponent,
+            //     while the remaining fields don't exist yet
+            if (RawMentionSnippetBox == null || RawMentionIdInput == null) return;
+
+            // UA: Дужки навколо "as string" не обов'язкові за правилами
+            //     пріоритету, але без них рядок читається як "as (string switch
+            //     ...)", що збиває з пантелику при читанні
+            // EN: The parentheses around "as string" aren't required by
+            //     precedence rules, but without them the line reads as
+            //     "as (string switch ...)", which is confusing to read
+            var tag = (MentionTypeCombo.SelectedItem as ComboBoxItem)?.Tag as string;
+
+            var kind = tag switch
+            {
+                "user" => DiscordService.MentionKind.User,
+                "channel" => DiscordService.MentionKind.Channel,
+                _ => DiscordService.MentionKind.Role
+            };
+
+            var snippet = DiscordService.FormatMention(kind, RawMentionIdInput.Text);
+
+            // UA: Порожній результат = ID ще не введений або введений не лише
+            //     цифрами (наприклад, скопійований цілий тег). Блок просто
+            //     ховається — це не помилка, поле необов'язкове
+            // EN: An empty result = the ID isn't entered yet, or isn't
+            //     digits-only (e.g. a whole tag was pasted). The block simply
+            //     hides — this isn't an error, the field is optional
+            RawMentionSnippetBox.Text = snippet;
+            PanelRawMentionSnippet.Visibility = snippet.Length > 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void BtnCopyMentionSnippet_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(RawMentionSnippetBox.Text))
+                System.Windows.Clipboard.SetText(RawMentionSnippetBox.Text);
+        }
+
+        // =====================================================================
+        // UA: Вибір Discord-каналу для цієї відправки.
+        // EN: Discord channel selection for this send.
+        // =====================================================================
+        private void BuildChannelList()
+        {
+            // UA: Основний канал завжди перший і завжди в списку — навіть коли
+            //     людина перемикається на інший, має бути видно, звідки вона
+            //     пішла і куди повернутись
+            // EN: The primary channel is always first and always in the list —
+            //     even when switching away, it should be visible where you came
+            //     from and where to return
+            var channels = new List<DiscordWebhookTarget>();
+
+            if (!string.IsNullOrWhiteSpace(_settings.DiscordWebhookUrl))
+            {
+                channels.Add(new DiscordWebhookTarget
+                {
+                    Name = string.IsNullOrWhiteSpace(_settings.DiscordWebhookName)
+                        ? _loc.Get("send.channel.primary_default")
+                        : _settings.DiscordWebhookName,
+                    Url = _settings.DiscordWebhookUrl
+                });
+            }
+
+            // UA: Записи без URL пропускаємо — порожній рядок у налаштуваннях
+            //     не має ставати пунктом списку, який мовчки нікуди не надішле
+            // EN: Entries without a URL are skipped — an empty row in settings
+            //     shouldn't become a list item that silently sends nowhere
+            channels.AddRange(_settings.DiscordExtraWebhooks
+                .Where(w => !string.IsNullOrWhiteSpace(w.Url))
+                .Select(w => new DiscordWebhookTarget
+                {
+                    Name = string.IsNullOrWhiteSpace(w.Name)
+                        ? _loc.Get("send.channel.unnamed")
+                        : w.Name,
+                    Url = w.Url
+                }));
+
+            // UA: Перебудова не має скидати вже зроблений вибір (метод
+            //     викликається й при перемиканні мови) — тому запам'ятовуємо
+            //     URL і повертаємось на нього, якщо такий канал ще існує
+            // EN: Rebuilding must not reset an existing choice (the method also
+            //     runs on language switch) — so remember the URL and return to
+            //     it if that channel still exists
+            var previous = ChannelCombo.SelectedValue as string;
+
+            ChannelCombo.ItemsSource = channels;
+            ChannelCombo.SelectedIndex = 0;
+
+            if (!string.IsNullOrEmpty(previous))
+            {
+                var match = channels.FindIndex(c => c.Url == previous);
+                if (match >= 0) ChannelCombo.SelectedIndex = match;
+            }
+
+            // UA: Один канал — вибирати нема з чого, блок не показуємо взагалі
+            // EN: One channel — there's nothing to choose, don't show the block
+            PanelChannelPicker.Visibility = channels.Count > 1
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void ChkOverrideChannel_Changed(object sender, RoutedEventArgs e)
+        {
+            if (ChannelCombo == null) return;
+
+            bool custom = ChkOverrideChannel.IsChecked == true;
+            ChannelCombo.Visibility = custom ? Visibility.Visible : Visibility.Collapsed;
+
+            // UA: Знімаючи галочку, повертаємось саме на основний канал, а не
+            //     лишаємо останній обраний — інакше "вимкнув перевизначення",
+            //     а надсилає все одно кудись убік
+            // EN: Unticking returns to the primary channel rather than keeping
+            //     the last selection — otherwise "override off" would still
+            //     send somewhere else
+            if (!custom) ChannelCombo.SelectedIndex = 0;
+        }
+
+        // UA: Канал для поточної відправки. null = типовий з налаштувань, тож
+        //     сервіси не мусять знати про існування перемикача
+        // EN: The channel for the current send. null = the default from
+        //     settings, so the services need not know the toggle exists
+        private string? SelectedWebhookUrl()
+        {
+            if (ChkOverrideChannel.IsChecked == true)
+                return ChannelCombo.SelectedValue as string;
+
+            // UA: Вироджений, але цілком можливий випадок: основний вебхук
+            //     порожній (наприклад, у appsettings.json його стерли руками),
+            //     а додаткові канали заведені. Повернути тут null означало б
+            //     віддати сервісу порожній URL — той просто нічого не надішле,
+            //     і людина побачить "надіслано" без жодного повідомлення в
+            //     Discord. Тому підставляємо перший доступний канал.
+            // EN: A degenerate but entirely possible case: the primary webhook
+            //     is empty (e.g. hand-deleted from appsettings.json) while
+            //     additional channels are configured. Returning null here would
+            //     hand the service an empty URL — it would simply send nothing,
+            //     and the person would see "sent" with no Discord message at
+            //     all. So we fall back to the first available channel.
+            if (string.IsNullOrWhiteSpace(_settings.DiscordWebhookUrl))
+                return ChannelCombo.SelectedValue as string;
+
+            return null;
+        }
+
         private async Task LoadCandidatesAsync()
         {
             if (_youTubeService == null) return;
 
-            TxtPickerStatus.Visibility = Visibility.Visible;
-            TxtPickerStatus.Text = _loc.Get("send.picker.loading");
+            ShowStatusLoading();
             BtnTogglePicker.Content = _loc.Get("send.picker.toggle");
 
             try
             {
-                _candidates = await _youTubeService.GetCandidatesAsync();
+                // UA: Помилка мережі більше не знищує список — сервіс поверне
+                //     те, що є в локальному кеші, і окремо повідомить, що
+                //     онлайн-оновитись не вдалося
+                // EN: A network error no longer wipes the list — the service
+                //     returns whatever is in the local cache and separately
+                //     reports that the online refresh failed
+                var (candidates, fetchError) = await _youTubeService.GetCandidatesWithStatusAsync();
+                _candidates = candidates;
                 BuildCandidateItems();
-                TxtPickerStatus.Visibility = Visibility.Collapsed;
+
+                if (fetchError != null)
+                    await ReportLoadFailureAsync(fetchError);
+                else
+                    HideStatus();
 
                 if (ChkAutoLatest.IsChecked == true)
                     AutoFillBestPick();
                 else
                     UpdatePreview();
             }
-            catch
+            catch (Exception ex)
             {
-                TxtPickerStatus.Text = _loc.Get("send.picker.error");
+                // UA: Сюди потрапляє лише те, що зламалось уже після отримання
+                //     даних (наприклад, побудова списку) — сам мережевий збій
+                //     обробляється вище через fetchError
+                // EN: Only failures after the data was obtained land here (e.g.
+                //     list building) — the network failure itself is handled
+                //     above via fetchError
+                await ReportLoadFailureAsync(ex);
+                UpdatePreview();
+            }
+        }
+
+        // =====================================================================
+        // UA: Повідомлення про проблеми із завантаженням списку.
+        //     Гібридна стратегія свідомо: модальне вікно з'являється ЛИШЕ коли
+        //     працювати справді нічим (ані свіжих даних, ані кешу) — інакше
+        //     людина отримувала б модалку при кожному відкритті вікна без
+        //     інтернету, навіть коли список нормально показано з кешу. У
+        //     "м'якому" випадку достатньо помітного банера в самому вікні.
+        //     У будь-якому разі повний стектрейс іде в logs/ — рядок в UI
+        //     пояснює ситуацію людині, лог потрібен для розбору причини.
+        // EN: Reporting list-loading problems.
+        //     The hybrid strategy is deliberate: a modal dialog appears ONLY
+        //     when there's genuinely nothing to work with (neither fresh data
+        //     nor cache) — otherwise the user would get a modal every time they
+        //     open this window offline, even when the list is served fine from
+        //     cache. In the "soft" case a visible in-window banner is enough.
+        //     Either way the full stack trace goes to logs/ — the UI line
+        //     explains the situation to a human, the log is for diagnosing it.
+        // =====================================================================
+        private async Task ReportLoadFailureAsync(Exception error)
+        {
+            await new CrashLogService().LogErrorAsync(
+                "SendNotificationWindow: failed to refresh the YouTube candidate list",
+                error);
+
+            bool hasCache = _candidates.Count > 0;
+
+            ShowStatus(
+                icon: hasCache ? "⚠" : "⛔",
+                text: _loc.Get(hasCache ? "send.picker.offline" : "send.picker.error"),
+                foreground: hasCache ? "#F0C674" : "#F08A8A",
+                border: hasCache ? "#7A5F1F" : "#7A2F2F",
+                background: hasCache ? "#2A2213" : "#2A1414",
+                allowRetry: true);
+
+            if (hasCache) return;
+
+            // UA: Кеш порожній — список порожній, вручну теж нічого не
+            //     підставиться. Це вже блокує роботу, тож модалка виправдана
+            // EN: Empty cache — the list is empty and nothing will be
+            //     pre-filled either. That actually blocks the user, so a modal
+            //     is warranted here
+            System.Windows.MessageBox.Show(
+                this,
+                $"{_loc.Get("send.picker.error")}\n\n{error.Message}",
+                _loc.Get("send.title"),
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        private void ShowStatusLoading() => ShowStatus(
+            icon: "⏳",
+            text: _loc.Get("send.picker.loading"),
+            foreground: "#A89CB8",
+            border: "#3D2B5E",
+            background: "#1A1425",
+            allowRetry: false);
+
+        private void ShowStatus(string icon, string text, string foreground,
+                                string border, string background, bool allowRetry)
+        {
+            TxtPickerStatusIcon.Text = icon;
+            TxtPickerStatus.Text = text;
+
+            var fg = Brush(foreground);
+            TxtPickerStatusIcon.Foreground = fg;
+            TxtPickerStatus.Foreground = fg;
+            PanelPickerStatus.BorderBrush = Brush(border);
+            PanelPickerStatus.Background = Brush(background);
+
+            var retryVisibility = allowRetry ? Visibility.Visible : Visibility.Collapsed;
+            BtnRetryLoad.Visibility = retryVisibility;
+
+            // UA: Кнопка платного API-шляху живе рівно стільки ж, скільки й
+            //     банер помилки: у нормальному стані її взагалі не існує, щоб
+            //     ніхто не витратив квоту "просто так", не маючи проблеми
+            // EN: The paid API-path button lives exactly as long as the error
+            //     banner: in the normal state it doesn't exist at all, so nobody
+            //     burns quota "just because" without actually having a problem
+            BtnApiFallback.Visibility = retryVisibility;
+            BtnApiFallback.ToolTip = _loc.Get("send.picker.api_fallback.tooltip");
+
+            PanelPickerStatus.Visibility = Visibility.Visible;
+        }
+
+        private void HideStatus() => PanelPickerStatus.Visibility = Visibility.Collapsed;
+
+        // UA: Хелпер, щоб не повторювати ColorConverter у кожному виклику
+        // EN: Helper so ColorConverter isn't repeated at every call site
+        //     (?? Colors.Transparent — щоб не отримати попередження про
+        //     розпакування можливого null; на практиці всі hex тут константні)
+        //     (?? Colors.Transparent — to avoid an unboxing-possible-null
+        //     warning; in practice every hex here is a constant)
+        private static SolidColorBrush Brush(string hex) =>
+            new((Color)(ColorConverter.ConvertFromString(hex) ?? Colors.Transparent));
+
+        // UA: Повторна спроба без перезапуску програми — той самий шлях, що й
+        //     при відкритті вікна, тож окремої логіки не потрібно
+        // EN: Retry without restarting the app — the same path as on window
+        //     open, so no separate logic is needed
+        private async void BtnRetryLoad_Click(object sender, RoutedEventArgs e)
+        {
+            BtnRetryLoad.IsEnabled = false;
+            try
+            {
+                await LoadCandidatesAsync();
+            }
+            finally
+            {
+                BtnRetryLoad.IsEnabled = true;
+            }
+        }
+
+        // =====================================================================
+        // UA: Запасний шлях через YouTube Data API. Свідомо вимагає підтвердження
+        //     і показує ціну в юнітах ДО запуску, а не після: на відміну від
+        //     безкоштовного RSS цей шлях витрачає добову квоту, і людина має
+        //     розуміти, за що платить, перш ніж натиснути. Ліміт скидається раз
+        //     на добу за тихоокеанським часом, тож "перевитратити випадково" —
+        //     цілком реальний сценарій, який коштував би решти дня без анонсів.
+        // EN: The YouTube Data API fallback path. It deliberately asks for
+        //     confirmation and shows the cost in units BEFORE running, not
+        //     after: unlike the free RSS feed this path spends the daily quota,
+        //     and the person should understand what they're paying before
+        //     clicking. The limit resets once a day on Pacific time, so
+        //     "accidentally overspending" is a very real scenario that would
+        //     cost them the rest of the day without announcements.
+        // =====================================================================
+        private async void BtnApiFallback_Click(object sender, RoutedEventArgs e)
+        {
+            if (_youTubeService == null) return;
+
+            var confirm = System.Windows.MessageBox.Show(
+                this,
+                string.Format(
+                    _loc.Get("send.picker.api_fallback.confirm"),
+                    Core.Services.YouTubeService.ApiFallbackQuotaCost),
+                _loc.Get("send.title"),
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            BtnApiFallback.IsEnabled = false;
+            BtnRetryLoad.IsEnabled = false;
+            ShowStatusLoading();
+
+            try
+            {
+                var (candidates, error) = await _youTubeService.GetCandidatesViaApiAsync();
+                _candidates = candidates;
+                BuildCandidateItems();
+
+                if (error != null)
+                {
+                    await ReportLoadFailureAsync(error);
+                }
+                else
+                {
+                    // UA: Список свіжий, але отриманий платним шляхом — кажемо
+                    //     про це прямо, щоб витрата квоти не була невидимою
+                    // EN: The list is fresh but came via the paid path — say so
+                    //     plainly, so the quota spend isn't invisible
+                    ShowStatus(
+                        icon: "✅",
+                        text: string.Format(
+                            _loc.Get("send.picker.api_fallback.done"),
+                            Core.Services.YouTubeService.ApiFallbackQuotaCost),
+                        foreground: "#8FD18F",
+                        border: "#2F5A2F",
+                        background: "#14220F",
+                        allowRetry: false);
+                }
+
+                if (ChkAutoLatest.IsChecked == true)
+                    AutoFillBestPick();
+                else
+                    UpdatePreview();
+            }
+            catch (Exception ex)
+            {
+                await ReportLoadFailureAsync(ex);
+            }
+            finally
+            {
+                BtnApiFallback.IsEnabled = true;
+                BtnRetryLoad.IsEnabled = true;
             }
         }
 
@@ -184,7 +696,7 @@ namespace EMP.UAHelper.WPF
                 string dateLabel;
                 if (displayTime.HasValue)
                 {
-                    var (d, t) = FormatKyivTime(displayTime.Value);
+                    var (d, t) = FormatLocalTime(displayTime.Value);
                     dateLabel = $"{d} {t}";
                 }
                 else
@@ -225,7 +737,19 @@ namespace EMP.UAHelper.WPF
 
         private void AutoFillBestPick()
         {
-            if (_candidates.Count == 0) return;
+            // UA: Навіть якщо кандидатів немає — приклад повідомлення все одно
+            //     треба відрендерити з шаблону (з порожніми {title}/{url}),
+            //     інакше вікно виглядає повністю "мертвим" і незрозуміло, чи
+            //     проблема в каналі, чи в шаблонах
+            // EN: Even with no candidates, the preview must still be rendered
+            //     from the template (with empty {title}/{url}), otherwise the
+            //     window looks completely "dead" and it's unclear whether the
+            //     problem is the channel or the templates
+            if (_candidates.Count == 0)
+            {
+                UpdatePreview();
+                return;
+            }
 
             var pick = _candidates.FirstOrDefault(c => c.Type == VideoType.Live)
                 ?? _candidates.FirstOrDefault(c => c.Type == VideoType.Upcoming)
@@ -270,7 +794,7 @@ namespace EMP.UAHelper.WPF
             var displayTime = BestDisplayTime(entry);
             if (displayTime.HasValue)
             {
-                var (d, t) = FormatKyivTime(displayTime.Value);
+                var (d, t) = FormatLocalTime(displayTime.Value);
                 DateInput.Text = d;
                 TimeInput.Text = t;
             }
@@ -302,7 +826,7 @@ namespace EMP.UAHelper.WPF
             if (type == VideoType.Upcoming)
             {
                 TxtDateLabel.Text = _loc.Get("send.date_label");
-                TxtTimeLabel.Text = _loc.Get("send.time_label");
+                TxtTimeLabel.Text = string.Format(_loc.Get("send.time_label"), ZoneLabel());
             }
             else
             {
@@ -310,6 +834,14 @@ namespace EMP.UAHelper.WPF
                 TxtTimeLabel.Text = _loc.Get("send.time_label.published");
             }
         }
+
+        // UA: Коротка людяна назва поточної часової зони (з налаштувань,
+        //     через AppTimeZone) — підставляється в підписи полів дати/часу,
+        //     щоб ніде в UI не залишалось хардкодженого "Київ"
+        // EN: A short human-readable name of the current timezone (from
+        //     settings, via AppTimeZone) — substituted into date/time field
+        //     labels so no UI text is left with a hardcoded "Kyiv"
+        private string ZoneLabel() => AppTimeZone.Resolve(_settings.TimeZoneId).DisplayName;
 
         private void Field_TextChanged(object sender, TextChangedEventArgs e)
             => UpdatePreview();
@@ -464,13 +996,14 @@ namespace EMP.UAHelper.WPF
 
             var type = Enum.Parse<VideoType>((string)item.Tag);
             long? scheduled = type == VideoType.Upcoming
-                ? ParseKyivTime(DateInput.Text, TimeInput.Text)
+                ? ParseLocalTime(DateInput.Text, TimeInput.Text)
                 : null;
 
             var templates = _templateService.GetTemplates();
             var twitchUrl = _settings.UseTwitch ? _settings.TwitchUrl : string.Empty;
             var url = UrlInput.Text.Trim();
             var title = TitleInput.Text.Trim();
+            var timeZone = AppTimeZone.Resolve(_settings.TimeZoneId);
 
             if (_settings.UseTelegram)
             {
@@ -482,7 +1015,7 @@ namespace EMP.UAHelper.WPF
                     VideoType.Short => templates.Telegram.Short,
                     _ => string.Empty
                 };
-                PreviewTelegramBox.Text = _templateService.Apply(template, title, url, twitchUrl, scheduled);
+                PreviewTelegramBox.Text = _templateService.Apply(template, title, url, twitchUrl, timeZone, scheduled);
             }
 
             if (_settings.UseDiscord)
@@ -503,23 +1036,29 @@ namespace EMP.UAHelper.WPF
                     VideoType.Short => templates.Discord.Short,
                     _ => string.Empty
                 };
-                var renderedTitle = _templateService.Apply(titleTemplate, title, url, twitchUrl, scheduled);
-                var renderedBody = _templateService.Apply(bodyTemplate, title, url, twitchUrl, scheduled);
+                var renderedTitle = _templateService.Apply(titleTemplate, title, url, twitchUrl, timeZone, scheduled);
+                var renderedBody = _templateService.Apply(bodyTemplate, title, url, twitchUrl, timeZone, scheduled);
                 PreviewDiscordBox.Text = $"{renderedTitle}\n\n{renderedBody}";
             }
         }
 
-        private static (string date, string time) FormatKyivTime(long unixSeconds)
+        // UA: Часова зона береться з поточних налаштувань через AppTimeZone —
+        //     нічого не хардкодиться (раніше тут напряму стояло "FLE Standard
+        //     Time"). Тому методи більше не static — їм потрібен доступ до _settings
+        // EN: The timezone comes from the current settings via AppTimeZone —
+        //     nothing is hardcoded here (this used to have "FLE Standard Time"
+        //     inline). That's why these are no longer static — they need access to _settings
+        private (string date, string time) FormatLocalTime(long unixSeconds)
         {
-            var kyivZone = TimeZoneInfo.FindSystemTimeZoneById("FLE Standard Time");
-            var kyivTime = TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeSeconds(unixSeconds), kyivZone);
+            var timeZone = AppTimeZone.Resolve(_settings.TimeZoneId);
+            var localTime = TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeSeconds(unixSeconds), timeZone);
             return (
-                kyivTime.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                kyivTime.ToString("HH:mm", CultureInfo.InvariantCulture)
+                localTime.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                localTime.ToString("HH:mm", CultureInfo.InvariantCulture)
             );
         }
 
-        private static long? ParseKyivTime(string dateText, string timeText)
+        private long? ParseLocalTime(string dateText, string timeText)
         {
             if (!DateTime.TryParseExact(dateText.Trim(), "dd.MM.yyyy",
                     CultureInfo.InvariantCulture, DateTimeStyles.None, out var datePart))
@@ -529,14 +1068,145 @@ namespace EMP.UAHelper.WPF
                     CultureInfo.InvariantCulture, out var timePart))
                 return null;
 
-            var kyivZone = TimeZoneInfo.FindSystemTimeZoneById("FLE Standard Time");
+            var timeZone = AppTimeZone.Resolve(_settings.TimeZoneId);
             var localDateTime = datePart.Date + timePart;
-            var offset = kyivZone.GetUtcOffset(localDateTime);
+            var offset = timeZone.GetUtcOffset(localDateTime);
             return new DateTimeOffset(localDateTime, offset).ToUnixTimeSeconds();
+        }
+
+        // =====================================================================
+        // UA: Пікери дати/часу — 📅/🕐 відкривають спільний спливний Popup,
+        //     ⏱ одразу підставляє поточні дату/час (у зоні з налаштувань).
+        //     Один Popup на календар і один на годинник обслуговують усі 4
+        //     поля дати/часу в цьому вікні (шаблонний і ручний режими) —
+        //     через _dateTarget/_timeTarget код-behind знає, куди саме писати
+        //     результат вибору. Результат завжди записується в TextBox.Text —
+        //     тобто йде тим самим шляхом, що й ручне введення (спрацьовує той
+        //     самий TextChanged, та сама валідація)
+        // EN: Date/time pickers — 📅/🕐 open a shared floating Popup, ⏱
+        //     immediately fills in the current date/time (in the zone from
+        //     settings). One Popup for the calendar and one for the clock
+        //     serve all 4 date/time fields in this window (template and
+        //     manual modes) — _dateTarget/_timeTarget tell the code-behind
+        //     which field to write the picked value into. The result always
+        //     goes through TextBox.Text — the same path as manual typing
+        //     (same TextChanged, same validation)
+        // =====================================================================
+
+        private void BtnPickDate_Click(object sender, RoutedEventArgs e) => OpenDatePicker((Button)sender, DateInput);
+        private void BtnPickDateRaw_Click(object sender, RoutedEventArgs e) => OpenDatePicker((Button)sender, RawDateInput);
+        private void BtnPickTime_Click(object sender, RoutedEventArgs e) => OpenTimePicker((Button)sender, TimeInput);
+        private void BtnPickTimeRaw_Click(object sender, RoutedEventArgs e) => OpenTimePicker((Button)sender, RawTimeInput);
+
+        private void BtnDateNow_Click(object sender, RoutedEventArgs e) => SetDateNow(DateInput);
+        private void BtnDateNowRaw_Click(object sender, RoutedEventArgs e) => SetDateNow(RawDateInput);
+        private void BtnTimeNow_Click(object sender, RoutedEventArgs e) => SetTimeNow(TimeInput);
+        private void BtnTimeNowRaw_Click(object sender, RoutedEventArgs e) => SetTimeNow(RawTimeInput);
+
+        // UA: Відкрити календар біля конкретної кнопки, попередньо виділивши
+        //     дату, яка вже введена в полі (якщо вона коректна) — щоб пікер
+        //     не "забував" те, що людина вже ввела вручну
+        // EN: Open the calendar next to a specific button, pre-selecting the
+        //     date already typed into the field (if it's valid) — so the
+        //     picker doesn't "forget" what the person already entered by hand
+        private void OpenDatePicker(Button anchor, TextBox target)
+        {
+            _dateTarget = target;
+
+            DatePickerCalendar.SelectedDate =
+                DateTime.TryParseExact(target.Text.Trim(), "dd.MM.yyyy",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+                    ? parsed
+                    : null;
+
+            DatePickerPopup.PlacementTarget = anchor;
+            DatePickerPopup.IsOpen = true;
+        }
+
+        private void DatePickerCalendar_SelectedDatesChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // UA: Умови розбито на окремі if — компілятор C# не завжди може
+            //     довести, що pattern-змінна точно присвоєна, коли вона стоїть
+            //     поруч з іншою умовою через "||" в одному виразі.
+            // EN: Conditions are split into separate ifs — the C# compiler
+            //     can't always prove a pattern variable is definitely assigned
+            //     when it sits next to another condition via "||" in one expression.
+            if (_dateTarget == null)
+                return;
+            if (DatePickerCalendar.SelectedDate is not DateTime picked)
+                return;
+
+            _dateTarget.Text = picked.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+            DatePickerPopup.IsOpen = false;
+        }
+
+        // UA: Відкрити годинник біля конкретної кнопки, попередньо виставивши
+        //     години/хвилини з поля (якщо воно коректне), інакше — з поточного
+        //     часу в обраній зоні, щоб не стартувати з довільних 00:00
+        // EN: Open the clock next to a specific button, pre-setting hours/
+        //     minutes from the field (if it's valid), otherwise from the
+        //     current time in the configured zone, so it doesn't start from
+        //     an arbitrary 00:00
+        private void OpenTimePicker(Button anchor, TextBox target)
+        {
+            _timeTarget = target;
+
+            if (!TimeSpan.TryParseExact(target.Text.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out var current))
+            {
+                var zone = AppTimeZone.Resolve(_settings.TimeZoneId);
+                current = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone).TimeOfDay;
+            }
+
+            HourCombo.SelectedItem = current.Hours.ToString("00");
+            MinuteCombo.SelectedItem = current.Minutes.ToString("00");
+
+            TimePickerPopup.PlacementTarget = anchor;
+            TimePickerPopup.IsOpen = true;
+        }
+
+        private void BtnApplyTime_Click(object sender, RoutedEventArgs e)
+        {
+            // UA: Так само розбито на окремі if — з тієї ж причини, що й вище.
+            // EN: Same split into separate ifs — same reason as above.
+            if (_timeTarget == null)
+                return;
+            if (HourCombo.SelectedItem is not string h)
+                return;
+            if (MinuteCombo.SelectedItem is not string m)
+                return;
+
+            _timeTarget.Text = $"{h}:{m}";
+            TimePickerPopup.IsOpen = false;
+        }
+
+        // UA: "Зараз" — читає системний годинник і конвертує в обрану в
+        //     налаштуваннях зону (та сама AppTimeZone-логіка, що й усюди —
+        //     жодного окремого хардкоду тут)
+        // EN: "Now" — reads the system clock and converts it into the zone
+        //     configured in settings (the same AppTimeZone logic used
+        //     everywhere else — no separate hardcoding here)
+        private void SetDateNow(TextBox target)
+        {
+            var zone = AppTimeZone.Resolve(_settings.TimeZoneId);
+            var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
+            target.Text = now.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+        }
+
+        private void SetTimeNow(TextBox target)
+        {
+            var zone = AppTimeZone.Resolve(_settings.TimeZoneId);
+            var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
+            target.Text = now.ToString("HH:mm", CultureInfo.InvariantCulture);
         }
 
         private async void BtnSend_Click(object sender, RoutedEventArgs e)
         {
+            if (ChkRawMode.IsChecked == true)
+            {
+                await SendRawAsync();
+                return;
+            }
+
             var title = TitleInput.Text.Trim();
             if (string.IsNullOrWhiteSpace(title))
             {
@@ -551,7 +1221,7 @@ namespace EMP.UAHelper.WPF
 
             if (type == VideoType.Upcoming)
             {
-                scheduled = ParseKyivTime(DateInput.Text, TimeInput.Text);
+                scheduled = ParseLocalTime(DateInput.Text, TimeInput.Text);
                 if (scheduled == null)
                 {
                     System.Windows.MessageBox.Show(
@@ -585,7 +1255,47 @@ namespace EMP.UAHelper.WPF
             BtnSend.IsEnabled = false;
             try
             {
-                await _dispatcher.SendAsync(video);
+                await _dispatcher.SendAsync(video, SelectedWebhookUrl());
+                System.Windows.MessageBox.Show(
+                    _loc.Get("send.sent"), _loc.Get("app.name"),
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                Close();
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(
+                    ex.Message, _loc.Get("app.error"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                BtnSend.IsEnabled = true;
+            }
+        }
+
+        // UA: Повністю ручна відправка — жодного шаблону, жодної підстановки.
+        //     Кожна платформа отримує рівно той текст, що введений у своєму
+        //     полі; порожнє поле для платформи означає "не надсилати туди"
+        // EN: Fully manual send — no template, no substitution at all. Each
+        //     platform gets exactly the text typed into its own field; an
+        //     empty field for a platform means "don't send there"
+        private async Task SendRawAsync()
+        {
+            var telegramText = _settings.UseTelegram ? RawTelegramInput.Text.Trim() : string.Empty;
+            var discordText = _settings.UseDiscord ? RawDiscordInput.Text.Trim() : string.Empty;
+
+            if (string.IsNullOrWhiteSpace(telegramText) && string.IsNullOrWhiteSpace(discordText))
+            {
+                System.Windows.MessageBox.Show(
+                    _loc.Get("send.raw.validation.empty"), _loc.Get("app.name"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            BtnSend.IsEnabled = false;
+            try
+            {
+                await _dispatcher.SendRawAsync(telegramText, discordText, SelectedWebhookUrl());
                 System.Windows.MessageBox.Show(
                     _loc.Get("send.sent"), _loc.Get("app.name"),
                     MessageBoxButton.OK, MessageBoxImage.Information);

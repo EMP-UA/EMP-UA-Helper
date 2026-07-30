@@ -1,7 +1,12 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — LocalizationService.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Сервіс локалізації інтерфейсу (UA/EN)
 // EN: UI localization service (UA/EN)
+// =============================================================================
 namespace EMP.UAHelper.Core.Services
 {
     public enum UiLanguage { UA, EN }
@@ -84,6 +89,9 @@ namespace EMP.UAHelper.Core.Services
             ["settings.header"] = "Налаштування платформ",
             ["settings.description"] = "Оберіть, які платформи активні саме сьогодні. Зміни застосовуються одразу, без перезапуску програми.",
             ["settings.save"] = "💾 Зберегти зміни",
+            ["settings.group.general"] = "ЗАГАЛЬНЕ",
+            ["settings.timezone.label"] = "Часовий пояс",
+            ["settings.timezone.hint"] = "Використовується для всіх дат/часу трансляцій — у прикладах повідомлень, при виборі відео зі списку та в позначках часу для Discord/Telegram. Попередньо підставлена системна зона цього комп'ютера; збережене значення надалі не змінюється саме собою, навіть якщо системний час зміниться.",
             ["settings.group.content"] = "ДЖЕРЕЛА КОНТЕНТУ (де ви стрімите / публікуєте)",
             ["settings.group.notify"] = "ПЛАТФОРМИ СПОВІЩЕНЬ (куди надсилати анонси)",
 
@@ -114,6 +122,26 @@ namespace EMP.UAHelper.Core.Services
             ["send.picker.change"] = "змінити",
             ["send.picker.loading"] = "Завантаження списку з YouTube…",
             ["send.picker.error"] = "Не вдалося завантажити список з YouTube. Можна ввести дані вручну нижче.",
+            ["send.picker.offline"] = "Не вдалося оновитись з YouTube — показано збережений локально список. Деталі помилки в logs/.",
+            ["settings.dc.webhook_name"] = "Назва основного каналу (необов'язково)",
+            ["settings.dc.webhook_name.hint"] = "Підпис для вибору каналу у вікні надсилання. Якщо канал один — можна лишити порожнім.",
+            ["settings.dc.extra_channels"] = "Додаткові канали Discord",
+            ["settings.dc.extra_channels.hint"] = "Кожен рядок — назва і вебхук окремого каналу. Автоматичні сповіщення завжди йдуть в основний канал; ці потрібні лише щоб вручну надіслати кудись інше.",
+            ["settings.dc.add_channel"] = "➕ Додати канал",
+            ["settings.dc.remove_channel"] = "Видалити цей канал",
+            ["send.raw.mention.label"] = "Згадка Discord — введіть лише ID",
+            ["send.raw.mention.hint"] = "Вставте сам ID (тільки цифри) — готовий код згенерується нижче. У Discord: ПКМ по ролі/користувачу/каналу → «Копіювати ID» (потрібен режим розробника в налаштуваннях Discord).",
+            ["send.raw.mention.snippet"] = "Готовий код — скопіюйте і вставте в текст",
+            ["send.raw.mention.role"] = "Роль",
+            ["send.raw.mention.user"] = "Користувач",
+            ["send.raw.mention.channel"] = "Канал",
+            ["send.channel.override"] = "Надіслати в інший канал Discord",
+            ["send.channel.hint"] = "Типово повідомлення йде в основний канал. Список каналів налаштовується в «⚙️ Налаштування».",
+            ["send.channel.primary_default"] = "Основний канал",
+            ["send.channel.unnamed"] = "Канал без назви",
+            ["send.picker.api_fallback.tooltip"] = "Спробувати через YouTube Data API замість RSS (витрачає добову квоту)",
+            ["send.picker.api_fallback.confirm"] = "RSS-фід YouTube недоступний. Спробувати отримати список напряму через YouTube Data API?\n\nЦе витратить приблизно {0} одиниць добової квоти (типовий ліміт — 10 000 на добу, скидається щодоби). Безкоштовний RSS-шлях квоту не витрачає.\n\nПродовжити?",
+            ["send.picker.api_fallback.done"] = "Список отримано через YouTube Data API (витрачено ~{0} одиниць квоти).",
             ["send.picker.hint"] = "Список включає останні записи з YouTube та раніше збережені заплановані трансляції — навіть ті, що вже випали з переліку останніх ~15 відео на каналі.",
             ["send.title_label"] = "Заголовок",
             ["send.type_label"] = "Тип",
@@ -121,7 +149,7 @@ namespace EMP.UAHelper.Core.Services
             ["send.url_label"] = "Посилання (необов'язково)",
             ["send.url_hint"] = "Якщо вказати посилання — воно підставиться замість {url} у шаблоні. Якщо залишити порожнім — рядки шаблону з {url} просто не увійдуть у повідомлення.",
             ["send.date_label"] = "Дата початку (дд.MM.рррр)",
-            ["send.time_label"] = "Час початку (гг:хх, Київ)",
+            ["send.time_label"] = "Час початку (гг:хх, {0})",
             ["send.button"] = "📡 Надіслати",
             ["send.validation.title"] = "Введіть заголовок.",
             ["send.validation.datetime"] = "Введіть коректні дату і час у форматі дд.MM.рррр та гг:хх.",
@@ -132,6 +160,20 @@ namespace EMP.UAHelper.Core.Services
             ["send.preview.telegram"] = "Приклад — Telegram",
             ["send.preview.discord"] = "Приклад — Discord",
             ["send.thumbnail.twitch_note"] = "Прев'ю Twitch — неофіційне джерело (Twitch API вимагає авторизацію, якої ми уникаємо). Може не завантажитись або показувати застарілий стан каналу.",
+
+            ["send.raw.toggle"] = "✍️ Повністю ручний режим (без шаблону)",
+            ["send.raw.hint"] = "Жодних шаблонів і підстановок — відправляється рівно той текст, що ви ввели нижче, окремо для кожної платформи. Порожнє поле для платформи означає \"не надсилати туди\".",
+            ["send.raw.telegram_label"] = "Текст для Telegram",
+            ["send.raw.telegram_hint"] = "Підтримується HTML-форматування Telegram: <b>жирний</b>, <i>курсив</i>, <a href=\"...\">посилання</a>, <code>код</code>, <tg-spoiler>спойлер</tg-spoiler>. Незакриті теги призведуть до помилки відправки.",
+            ["send.raw.discord_label"] = "Текст для Discord",
+            ["send.raw.discord_hint"] = "Підтримується Markdown Discord: **жирний**, *курсив*, __підкреслення__, ~~закреслення~~, `код`. Теги: <@&ID_ролі> — згадати роль, <@ID_користувача> — згадати користувача, @everyone/@here. ID ролі можна взяти в налаштуваннях сервера (Роль → Копіювати ID, потрібен режим розробника). Ліміт — 2000 символів.",
+            ["send.raw.validation.empty"] = "Введіть текст хоча б для однієї увімкненої платформи.",
+            ["send.raw.empty_platforms"] = "Оберіть принаймні одну платформу сповіщень (Telegram або Discord) у налаштуваннях.",
+            ["send.raw.scheduled.date_label"] = "Дата трансляції (дд.MM.рррр) — необов'язково",
+            ["send.raw.scheduled.time_label"] = "Час трансляції (гг:хх, {0}) — необов'язково",
+            ["send.raw.scheduled.hint"] = "Заповніть, якщо хочете отримати готові позначки часу нижче — під кожним текстовим полем зʼявиться рядок, який можна скопіювати й вручну вставити в потрібне місце повідомлення.",
+            ["send.raw.scheduled.telegram_snippet"] = "Позначка часу — вставте в текст Telegram",
+            ["send.raw.scheduled.discord_snippet"] = "Позначка часу — вставте в текст Discord",
         };
 
         private static readonly Dictionary<string, string> EN = new()
@@ -195,6 +237,9 @@ namespace EMP.UAHelper.Core.Services
             ["settings.header"] = "Platform Settings",
             ["settings.description"] = "Choose which platforms are active today. Changes apply immediately, without restarting the app.",
             ["settings.save"] = "💾 Save changes",
+            ["settings.group.general"] = "GENERAL",
+            ["settings.timezone.label"] = "Timezone",
+            ["settings.timezone.hint"] = "Used for all stream dates/times — in message previews, when picking a video from the list, and in the Discord/Telegram timestamp snippets. Pre-filled with this machine's system zone; the saved value never changes by itself afterward, even if the system clock's zone changes.",
             ["settings.group.content"] = "CONTENT SOURCES (where you stream / publish)",
             ["settings.group.notify"] = "NOTIFICATION PLATFORMS (where to send announcements)",
 
@@ -225,6 +270,26 @@ namespace EMP.UAHelper.Core.Services
             ["send.picker.change"] = "change",
             ["send.picker.loading"] = "Loading list from YouTube…",
             ["send.picker.error"] = "Couldn't load the list from YouTube. You can still enter details manually below.",
+            ["send.picker.offline"] = "Couldn't refresh from YouTube — showing the locally cached list. Error details are in logs/.",
+            ["settings.dc.webhook_name"] = "Primary channel name (optional)",
+            ["settings.dc.webhook_name.hint"] = "A label for the channel picker in the send window. With a single channel it can stay empty.",
+            ["settings.dc.extra_channels"] = "Additional Discord channels",
+            ["settings.dc.extra_channels.hint"] = "Each row is the name and webhook of a separate channel. Automatic notifications always go to the primary channel; these exist only for manually sending somewhere else.",
+            ["settings.dc.add_channel"] = "➕ Add channel",
+            ["settings.dc.remove_channel"] = "Remove this channel",
+            ["send.raw.mention.label"] = "Discord mention — enter the ID only",
+            ["send.raw.mention.hint"] = "Paste just the ID (digits only) — the finished code is generated below. In Discord: right-click the role/user/channel → \"Copy ID\" (requires Developer Mode in Discord settings).",
+            ["send.raw.mention.snippet"] = "Finished code — copy and paste it into the text",
+            ["send.raw.mention.role"] = "Role",
+            ["send.raw.mention.user"] = "User",
+            ["send.raw.mention.channel"] = "Channel",
+            ["send.channel.override"] = "Send to a different Discord channel",
+            ["send.channel.hint"] = "By default the message goes to the primary channel. The channel list is configured in \"⚙️ Settings\".",
+            ["send.channel.primary_default"] = "Primary channel",
+            ["send.channel.unnamed"] = "Unnamed channel",
+            ["send.picker.api_fallback.tooltip"] = "Try the YouTube Data API instead of RSS (spends daily quota)",
+            ["send.picker.api_fallback.confirm"] = "The YouTube RSS feed is unavailable. Try fetching the list directly via the YouTube Data API?\n\nThis will spend roughly {0} units of the daily quota (the typical limit is 10,000 per day and resets daily). The free RSS path spends no quota.\n\nContinue?",
+            ["send.picker.api_fallback.done"] = "List fetched via the YouTube Data API (~{0} quota units spent).",
             ["send.picker.hint"] = "The list includes recent YouTube entries plus previously cached scheduled streams — even ones that dropped out of the channel's last ~15 videos.",
             ["send.title_label"] = "Title",
             ["send.type_label"] = "Type",
@@ -232,7 +297,7 @@ namespace EMP.UAHelper.Core.Services
             ["send.url_label"] = "Link (optional)",
             ["send.url_hint"] = "If you provide a link, it replaces {url} in the template. If left empty, template lines containing {url} are simply omitted.",
             ["send.date_label"] = "Start date (dd.MM.yyyy)",
-            ["send.time_label"] = "Start time (HH:mm, Kyiv)",
+            ["send.time_label"] = "Start time (HH:mm, {0})",
             ["send.button"] = "📡 Send",
             ["send.validation.title"] = "Please enter a title.",
             ["send.validation.datetime"] = "Enter a valid date and time in dd.MM.yyyy and HH:mm format.",
@@ -243,6 +308,20 @@ namespace EMP.UAHelper.Core.Services
             ["send.preview.telegram"] = "Preview — Telegram",
             ["send.preview.discord"] = "Preview — Discord",
             ["send.thumbnail.twitch_note"] = "Twitch preview is unofficial (the Twitch API requires authorization, which we avoid). It may fail to load or show a stale channel state.",
+
+            ["send.raw.toggle"] = "✍️ Fully manual mode (no template)",
+            ["send.raw.hint"] = "No templates or substitution at all — sends exactly the text you type below, separately for each platform. An empty field for a platform means \"don't send there\".",
+            ["send.raw.telegram_label"] = "Text for Telegram",
+            ["send.raw.telegram_hint"] = "Telegram HTML formatting is supported: <b>bold</b>, <i>italic</i>, <a href=\"...\">link</a>, <code>code</code>, <tg-spoiler>spoiler</tg-spoiler>. Unclosed tags will cause the send to fail.",
+            ["send.raw.discord_label"] = "Text for Discord",
+            ["send.raw.discord_hint"] = "Discord Markdown is supported: **bold**, *italic*, __underline__, ~~strikethrough~~, `code`. Tags: <@&roleID> — mention a role, <@userID> — mention a user, @everyone/@here. Get the role ID from server settings (Role → Copy ID, requires Developer Mode). Limit — 2000 characters.",
+            ["send.raw.validation.empty"] = "Enter text for at least one enabled platform.",
+            ["send.raw.empty_platforms"] = "Select at least one notification platform (Telegram or Discord) in settings.",
+            ["send.raw.scheduled.date_label"] = "Stream date (dd.MM.yyyy) — optional",
+            ["send.raw.scheduled.time_label"] = "Stream time (HH:mm, {0}) — optional",
+            ["send.raw.scheduled.hint"] = "Fill this in if you want ready-made timestamp snippets below — a copyable line will appear under each text field, which you can paste wherever needed in the message.",
+            ["send.raw.scheduled.telegram_snippet"] = "Timestamp — paste into the Telegram text",
+            ["send.raw.scheduled.discord_snippet"] = "Timestamp — paste into the Discord text",
         };
     }
 }

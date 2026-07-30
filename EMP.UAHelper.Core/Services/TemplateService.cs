@@ -1,7 +1,12 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — TemplateService.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Сервіс для завантаження та збереження шаблонів повідомлень
 // EN: Service for loading and saving message templates
+// =============================================================================
 using EMP.UAHelper.Core.Models;
 using System.Globalization;
 using System.Linq;
@@ -43,12 +48,15 @@ namespace EMP.UAHelper.Core.Services
 
         // UA: Застосувати змінні до шаблону. Рядки, що посилаються на {url} або {twitch},
         //     видаляються цілком, якщо відповідні дані порожні — щоб не лишати биті посилання
-        //     для тих, хто не використовує YouTube/Twitch
+        //     для тих, хто не використовує YouTube/Twitch. Часова зона для {scheduled_telegram}
+        //     передається явно викликачем (через AppTimeZone.Resolve) — тут нічого не хардкодиться
         // EN: Apply variables to a template. Lines referencing {url} or {twitch}
         //     are removed entirely when the corresponding data is empty — to avoid
-        //     dangling links for those who don't use YouTube/Twitch
+        //     dangling links for those who don't use YouTube/Twitch. The timezone for
+        //     {scheduled_telegram} is passed explicitly by the caller (via AppTimeZone.Resolve)
+        //     — nothing is hardcoded here
         public string Apply(string template, string title, string url,
-            string twitchUrl, long? scheduledTime = null)
+            string twitchUrl, TimeZoneInfo timeZone, long? scheduledTime = null)
         {
             // UA: Для Discord використовуємо Unix timestamp напряму
             // EN: For Discord we use Unix timestamp directly
@@ -56,22 +64,11 @@ namespace EMP.UAHelper.Core.Services
                 ? scheduledTime.Value.ToString()
                 : string.Empty;
 
-            // UA: Для Telegram конвертуємо в київський час з урахуванням літнього/зимнього часу
-            // EN: For Telegram convert to Kyiv time respecting daylight saving time
-            var scheduledTelegram = string.Empty;
-            if (scheduledTime.HasValue)
-            {
-                var kyivZone = TimeZoneInfo.FindSystemTimeZoneById("FLE Standard Time");
-                var kyivTime = TimeZoneInfo.ConvertTime(
-                    DateTimeOffset.FromUnixTimeSeconds(scheduledTime.Value),
-                    kyivZone);
-                var offset = kyivZone.IsDaylightSavingTime(kyivTime.DateTime)
-                    ? "UTC+3"
-                    : "UTC+2";
-                scheduledTelegram = kyivTime
-                    .ToString($"d MMMM о HH:mm ({offset})",
-                        new CultureInfo("uk-UA"));
-            }
+            // UA: Для Telegram конвертуємо в задану зону з урахуванням літнього/зимнього часу
+            // EN: For Telegram convert to the given zone respecting daylight saving time
+            var scheduledTelegram = scheduledTime.HasValue
+                ? FormatScheduledTelegram(scheduledTime.Value, timeZone)
+                : string.Empty;
 
             // UA: Прибираємо рядки, що посилаються на дані яких немає
             // EN: Strip lines that reference data which isn't available
@@ -89,6 +86,65 @@ namespace EMP.UAHelper.Core.Services
                 .Replace("{scheduled_telegram}", scheduledTelegram)
                 .Replace(VarScheduled, scheduledDiscord);
         }
+
+        // UA: Форматує Unix-час у читабельний рядок для Telegram у заданій
+        //     зоні, з урахуванням її літнього/зимового зсуву (офсет у
+        //     дужках обчислюється динамічно, а не хардкодиться). Публічний
+        //     і статичний, бо використовується не лише всередині Apply, а й
+        //     напряму в UI повністю ручного режиму — там немає шаблону,
+        //     який міг би підставити {scheduled_telegram} сам. Саму зону
+        //     хардкодити тут не можна — це відповідальність AppTimeZone
+        // EN: Formats a Unix timestamp into a human-readable Telegram string
+        //     in the given zone, respecting its own daylight saving shift
+        //     (the offset in parentheses is computed dynamically, not
+        //     hardcoded). Public and static because it's used not only
+        //     inside Apply but also directly by the fully manual mode UI —
+        //     there's no template there to substitute {scheduled_telegram}
+        //     automatically. The zone itself must not be hardcoded here —
+        //     that's AppTimeZone's responsibility
+        public static string FormatScheduledTelegram(long unixSeconds, TimeZoneInfo timeZone)
+        {
+            var localTime = TimeZoneInfo.ConvertTime(
+                DateTimeOffset.FromUnixTimeSeconds(unixSeconds),
+                timeZone);
+
+            // UA: DateTimeOffset.Offset після ConvertTime уже враховує
+            //     літній/зимовий час цільової зони на цей конкретний момент —
+            //     тут нічого додатково визначати не треба
+            // EN: DateTimeOffset.Offset after ConvertTime already accounts
+            //     for the target zone's daylight saving at that specific
+            //     moment — nothing extra to determine here
+            var offset = localTime.Offset;
+            var offsetLabel = offset < TimeSpan.Zero
+                ? $"UTC-{-offset:hh\\:mm}"
+                : $"UTC+{offset:hh\\:mm}";
+
+            // UA: Формуємо дату окремо від офсету й склеюємо рядки напряму —
+            //     якщо передати offsetLabel (із двокрапкою всередині) як
+            //     частину рядка формату для ToString, ":" там сприймається
+            //     не як текст, а як роздільник часу з поточної культури, що
+            //     теоретично могло б дати інший символ у нетипових культурах
+            // EN: Build the date and the offset separately and concatenate
+            //     plain strings — passing offsetLabel (which contains a
+            //     colon) as part of the ToString format string would make
+            //     .NET treat ":" as the culture's time separator token
+            //     rather than literal text, which could in theory render
+            //     differently under an unusual culture
+            var datePart = localTime.ToString("d MMMM о HH:mm",
+                new CultureInfo("uk-UA"));
+            return $"{datePart} ({offsetLabel})";
+        }
+
+        // UA: Готовий до вставки Discord timestamp-тег — той самий формат,
+        //     що й у шаблоні Upcoming (<t:...:F> — повна дата, <t:...:R> —
+        //     "через N годин"), Discord рендерить обидва варіанти в
+        //     локальному часі читача автоматично, без нашого коду
+        // EN: A ready-to-paste Discord timestamp tag — the same format used
+        //     in the Upcoming template (<t:...:F> — full date, <t:...:R> —
+        //     "in N hours"), Discord renders both in the reader's local time
+        //     automatically, no code on our side needed
+        public static string FormatScheduledDiscordSnippet(long unixSeconds) =>
+            $"<t:{unixSeconds}:F> (<t:{unixSeconds}:R>)";
 
         // UA: Завантажити шаблони з файлу або створити дефолтні
         // EN: Load templates from file or create defaults

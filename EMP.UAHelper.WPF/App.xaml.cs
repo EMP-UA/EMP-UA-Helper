@@ -1,7 +1,12 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — App.xaml.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Логіка запуску програми — ініціалізація сервісів і трею
 // EN: Application startup logic — services and tray initialization
+// =============================================================================
 using EMP.UAHelper.Core.Services;
 using System.IO;
 using System.Windows;

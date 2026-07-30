@@ -1,11 +1,16 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — ContentCacheService.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Сервіс локального кешу YouTube-контенту. Заплановані трансляції
 //     (Upcoming) з майбутньою датою зберігаються без обмеження за кількістю —
 //     доки не настане їхня дата. Решта записів ротується за лімітом.
 // EN: Local YouTube content cache service. Future-dated Upcoming entries are
 //     kept with no count limit — until their date arrives. Everything else
 //     is rotated by a fixed limit.
+// =============================================================================
 using EMP.UAHelper.Core.Models;
 using System.Linq;
 using System.Text.Json;

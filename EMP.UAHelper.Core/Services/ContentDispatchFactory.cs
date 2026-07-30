@@ -1,5 +1,9 @@
-﻿// Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper
-// Donate: https://ko-fi.com/emp_ua
+﻿// =============================================================================
+// EMP UA Helper — ContentDispatchFactory.cs
+// Автор / Author: EMP_UA (https://github.com/EMP-UA/EMP-UA-Helper)
+// Підтримати / Donate: https://ko-fi.com/emp_ua
+// Ліцензія / License: GPL-3.0
+// =============================================================================
 // UA: Фабрика — будує YouTubeService (опційно) і NotificationDispatcher
 //     з поточних AppSettings. Викликається як при старті програми, так і
 //     повторно з вікна налаштувань — щоб змінити комбінацію платформ
@@ -8,6 +12,7 @@
 //     from the current AppSettings. Called both at app startup and again from
 //     the settings window — to change "today's" platform combination
 //     without restarting
+// =============================================================================
 namespace EMP.UAHelper.Core.Services
 {
     public static class ContentDispatchFactory
@@ -32,6 +37,7 @@ namespace EMP.UAHelper.Core.Services
                     settings.TelegramBotToken,
                     settings.ChannelUsername,
                     twitchUrl,
+                    settings.TimeZoneId,
                     templateService)
                 : null;
 
@@ -40,6 +46,7 @@ namespace EMP.UAHelper.Core.Services
                     settings.DiscordWebhookUrl,
                     twitchUrl,
                     settings.DiscordRoleId,
+                    settings.TimeZoneId,
                     templateService)
                 : null;
 
