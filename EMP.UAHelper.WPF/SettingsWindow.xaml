@@ -302,7 +302,27 @@
                 <Rectangle Height="1" Fill="#3D2B5E" Margin="0,14,0,0"/>
                 <TextBlock x:Name="TxtDcExtraChannels" Style="{StaticResource FieldLabel}"/>
                 <TextBlock x:Name="TxtDcExtraChannelsHint" Style="{StaticResource FieldHint}"/>
-                <StackPanel x:Name="PanelExtraChannels" Margin="0,4,0,0"/>
+
+                <!-- UA: Заголовок-підпис над рядками — без нього незрозуміло,
+                         яке поле це назва каналу, а яке його URL (баг з
+                         реального тестування v1.3.0). Колонки мають ті самі
+                         ширини, що й у рядках, які будує AddChannelRow().
+                     EN: A header label above the rows — without it it's
+                         unclear which field is the channel name and which is
+                         its URL (a bug found during real-world v1.3.0
+                         testing). Columns match the widths AddChannelRow()
+                         builds each row with. -->
+                <Grid Margin="0,4,0,3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="TxtDcChannelColName" Grid.Column="0" Style="{StaticResource FieldHint}"/>
+                    <TextBlock x:Name="TxtDcChannelColUrl" Grid.Column="1" Style="{StaticResource FieldHint}" Margin="6,0,0,0"/>
+                </Grid>
+                <StackPanel x:Name="PanelExtraChannels" Margin="0,0,0,0"/>
                 <Button x:Name="BtnAddChannel" Style="{StaticResource RevealButton}"
                         HorizontalAlignment="Left" Width="Auto" Padding="12,0"
                         Margin="0,6,0,0" Click="BtnAddChannel_Click"/>

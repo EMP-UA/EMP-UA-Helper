@@ -125,6 +125,8 @@ namespace EMP.UAHelper.WPF
             TxtDcWebhookNameHint.Text = _loc.Get("settings.dc.webhook_name.hint");
             TxtDcExtraChannels.Text = _loc.Get("settings.dc.extra_channels");
             TxtDcExtraChannelsHint.Text = _loc.Get("settings.dc.extra_channels.hint");
+            TxtDcChannelColName.Text = _loc.Get("settings.dc.col_name");
+            TxtDcChannelColUrl.Text = _loc.Get("settings.dc.col_url");
             BtnAddChannel.Content = _loc.Get("settings.dc.add_channel");
             TxtTwUrl.Text = _loc.Get("firstrun.tw.url");
             TxtTwUrlHint.Text = _loc.Get("firstrun.tw.url.hint");
@@ -271,24 +273,23 @@ namespace EMP.UAHelper.WPF
         // =====================================================================
         // UA: Додаткові Discord-канали. Рядки будуються з коду, бо їх кількість
         //     довільна — описати їх статично в XAML неможливо. Кожен рядок це
-        //     назва + URL + кнопка видалення; жодного зайвого стану не
-        //     зберігаємо, значення читаються прямо з полів при збереженні.
-        //     URL тут відкритий, а не під PasswordBox, на відміну від
-        //     основного вебхука. Це свідомо: приховане поле, яке не можна
-        //     звірити очима, при кількох схожих URL перетворює вибір каналу на
-        //     вгадування, а сам файл appsettings.json усе одно лежить у
-        //     відкритому вигляді поруч з exe — тобто приховування в UI тут
-        //     дало б відчуття захисту, а не захист.
+        //     назва + URL (замасковано, як основний вебхук — див. нижче) +
+        //     кнопка видалення; жодного зайвого стану не зберігаємо, значення
+        //     читаються прямо з полів при збереженні.
+        //     Раніше URL тут був відкритим текстом, на відміну від основного
+        //     вебхука — за реальним використанням це виявилось нелогічним і
+        //     небезпечним (URL веб-хука дає повний доступ до відправки
+        //     повідомлень у канал), тож маскування зробили однаковим для
+        //     всіх URL-полів.
         // EN: Additional Discord channels. Rows are built from code because
         //     their count is arbitrary — they can't be declared statically in
-        //     XAML. Each row is name + URL + a delete button; no extra state is
-        //     kept, values are read straight from the fields on save.
-        //     The URL here is shown in the clear rather than behind a
-        //     PasswordBox, unlike the primary webhook. That's deliberate: a
-        //     masked field you can't verify by eye turns picking between
-        //     several similar URLs into guesswork, and appsettings.json itself
-        //     sits in plain text next to the exe anyway — so masking here would
-        //     provide the feeling of protection rather than protection.
+        //     XAML. Each row is name + URL (masked, like the primary webhook —
+        //     see below) + a delete button; no extra state is kept, values are
+        //     read straight from the fields on save.
+        //     The URL used to be shown in the clear here, unlike the primary
+        //     webhook — real-world use showed that inconsistent and unsafe (a
+        //     webhook URL grants full access to post into that channel), so
+        //     masking is now the same for every URL field.
         // =====================================================================
         private void BtnAddChannel_Click(object sender, RoutedEventArgs e)
             => AddChannelRow(string.Empty, string.Empty);
@@ -299,6 +300,7 @@ namespace EMP.UAHelper.WPF
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var nameBox = new TextBox
             {
@@ -308,14 +310,40 @@ namespace EMP.UAHelper.WPF
             };
             Grid.SetColumn(nameBox, 0);
 
-            var urlBox = new TextBox
+            // UA: URL цього каналу — та сама пара PasswordBox/TextBox з
+            //     кнопкою 👁, що й у основного вебхука, тільки своя на кожен
+            //     рядок (сховати/розкрити один канал не чіпає інші).
+            // EN: This channel's URL — the same PasswordBox/TextBox pair with
+            //     a 👁 button as the primary webhook, just its own per row
+            //     (hiding/revealing one channel doesn't affect the others).
+            var urlSecure = new PasswordBox
+            {
+                Password = url,
+                Style = (Style)FindResource("SecureInputField"),
+                Margin = new Thickness(6, 0, 0, 0),
+                Tag = "url"
+            };
+            Grid.SetColumn(urlSecure, 1);
+
+            var urlPlain = new TextBox
             {
                 Text = url,
                 Style = (Style)FindResource("InputField"),
                 Margin = new Thickness(6, 0, 0, 0),
-                Tag = "url"
+                Tag = "url",
+                Visibility = Visibility.Collapsed
             };
-            Grid.SetColumn(urlBox, 1);
+            Grid.SetColumn(urlPlain, 1);
+
+            var toggleButton = new Button
+            {
+                Content = "👁",
+                Style = (Style)FindResource("RevealButton"),
+                Margin = new Thickness(6, 0, 0, 0),
+                ToolTip = _loc.Get("settings.dc.reveal_channel")
+            };
+            Grid.SetColumn(toggleButton, 2);
+            toggleButton.Click += (_, _) => TogglePasswordVisibility(urlSecure, urlPlain, toggleButton);
 
             var removeButton = new Button
             {
@@ -324,11 +352,13 @@ namespace EMP.UAHelper.WPF
                 Margin = new Thickness(6, 0, 0, 0),
                 ToolTip = _loc.Get("settings.dc.remove_channel")
             };
-            Grid.SetColumn(removeButton, 2);
+            Grid.SetColumn(removeButton, 3);
             removeButton.Click += (_, _) => PanelExtraChannels.Children.Remove(row);
 
             row.Children.Add(nameBox);
-            row.Children.Add(urlBox);
+            row.Children.Add(urlSecure);
+            row.Children.Add(urlPlain);
+            row.Children.Add(toggleButton);
             row.Children.Add(removeButton);
 
             PanelExtraChannels.Children.Add(row);
@@ -337,20 +367,34 @@ namespace EMP.UAHelper.WPF
         // UA: Рядки без URL відкидаємо мовчки — порожній рядок, який людина
         //     додала й передумала заповнювати, не має ставати "каналом", що
         //     нікуди не надсилає. Назва без URL сенсу не має, URL без назви —
-        //     цілком (підставиться локалізоване "Канал без назви")
+        //     цілком (підставиться локалізоване "Канал без назви").
+        //     URL читаємо через той самий SecureValue(), що й основний
+        //     вебхук — він сам визначає, яке з двох полів (приховане чи
+        //     розкрите) зараз актуальне.
         // EN: Rows without a URL are dropped silently — an empty row the person
         //     added and then decided against shouldn't become a "channel" that
         //     sends nowhere. A name without a URL is meaningless; a URL without
-        //     a name is fine (the localized "Unnamed channel" is used)
+        //     a name is fine (the localized "Unnamed channel" is used).
+        //     The URL is read through the same SecureValue() as the primary
+        //     webhook — it figures out on its own which of the two fields
+        //     (hidden or revealed) currently holds the live value.
         private List<DiscordWebhookTarget> CollectExtraChannels()
         {
             var result = new List<DiscordWebhookTarget>();
 
             foreach (var row in PanelExtraChannels.Children.OfType<Grid>())
             {
-                var boxes = row.Children.OfType<TextBox>().ToList();
-                var name = boxes.FirstOrDefault(b => (b.Tag as string) == "name")?.Text.Trim() ?? string.Empty;
-                var url = boxes.FirstOrDefault(b => (b.Tag as string) == "url")?.Text.Trim() ?? string.Empty;
+                var name = row.Children.OfType<TextBox>()
+                    .FirstOrDefault(b => (b.Tag as string) == "name")?.Text.Trim() ?? string.Empty;
+
+                var urlSecure = row.Children.OfType<PasswordBox>()
+                    .FirstOrDefault(b => (b.Tag as string) == "url");
+                var urlPlain = row.Children.OfType<TextBox>()
+                    .FirstOrDefault(b => (b.Tag as string) == "url");
+
+                var url = (urlSecure != null && urlPlain != null
+                    ? SecureValue(urlSecure, urlPlain)
+                    : string.Empty).Trim();
 
                 if (url.Length == 0) continue;
 

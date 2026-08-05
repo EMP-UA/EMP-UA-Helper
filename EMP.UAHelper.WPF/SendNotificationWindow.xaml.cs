@@ -46,6 +46,16 @@ namespace EMP.UAHelper.WPF
         private List<ContentCacheEntry> _candidates = new();
         private bool _isReady;
 
+        // UA: Список каналів Discord, що зараз стоїть у ChannelCombo — сам
+        //     ComboBox прив'язаний лише до назв (рядків), тож саме тут
+        //     тримаємо відповідність "індекс у списку -> реальний URL".
+        //     Детальніше — коментар у BuildChannelList().
+        // EN: The list of Discord channels currently in ChannelCombo — the
+        //     ComboBox itself is bound only to the names (strings), so this
+        //     is where "list index -> real URL" is tracked. See the comment
+        //     in BuildChannelList() for why.
+        private List<DiscordWebhookTarget> _channels = new();
+
         // UA: Яке текстове поле зараз "слухає" спільний піквер дати/часу —
         //     призначається перед відкриттям відповідного Popup
         // EN: Which text field the shared date/time picker is currently
@@ -367,18 +377,43 @@ namespace EMP.UAHelper.WPF
 
             // UA: Перебудова не має скидати вже зроблений вибір (метод
             //     викликається й при перемиканні мови) — тому запам'ятовуємо
-            //     URL і повертаємось на нього, якщо такий канал ще існує
+            //     URL (за старим _channels/SelectedIndex) і повертаємось на
+            //     нього, якщо такий канал ще існує
             // EN: Rebuilding must not reset an existing choice (the method also
-            //     runs on language switch) — so remember the URL and return to
-            //     it if that channel still exists
-            var previous = ChannelCombo.SelectedValue as string;
+            //     runs on language switch) — so remember the URL (via the old
+            //     _channels/SelectedIndex) and return to it if that channel
+            //     still exists
+            string? previousUrl = null;
+            if (ChannelCombo.SelectedIndex >= 0 && ChannelCombo.SelectedIndex < _channels.Count)
+                previousUrl = _channels[ChannelCombo.SelectedIndex].Url;
 
-            ChannelCombo.ItemsSource = channels;
+            _channels = channels;
+
+            // UA: ComboBox прив'язуємо до самих назв (List<string>), а не до
+            //     об'єктів DiscordWebhookTarget напряму. Причина: кастомний
+            //     ControlTemplate у Styles/DarkComboBox.xaml (ComboField) не
+            //     синхронізує DisplayMemberPath із закритим станом
+            //     комбобокса — замість "Name" показує повний .ToString()
+            //     об'єкта, тобто "EMP.UAHelper.Core.Services.DiscordWebhookTarget".
+            //     У рядків такої проблеми немає: ToString() рядка — він сам.
+            //     Реальний URL для вибраного пункту беремо з _channels за
+            //     тим самим індексом (SelectedIndexChanged тут не потрібен).
+            // EN: The ComboBox is bound to the plain names (List<string>),
+            //     not directly to DiscordWebhookTarget objects. Reason: the
+            //     custom ControlTemplate in Styles/DarkComboBox.xaml
+            //     (ComboField) doesn't sync DisplayMemberPath with the
+            //     closed-box state of the combo — instead of "Name" it shows
+            //     the object's raw .ToString(), i.e.
+            //     "EMP.UAHelper.Core.Services.DiscordWebhookTarget". Strings
+            //     don't have that problem: a string's ToString() is itself.
+            //     The actual URL for the selected entry is read from
+            //     _channels at the same index (no SelectedIndexChanged needed).
+            ChannelCombo.ItemsSource = channels.Select(c => c.Name).ToList();
             ChannelCombo.SelectedIndex = 0;
 
-            if (!string.IsNullOrEmpty(previous))
+            if (!string.IsNullOrEmpty(previousUrl))
             {
-                var match = channels.FindIndex(c => c.Url == previous);
+                var match = channels.FindIndex(c => c.Url == previousUrl);
                 if (match >= 0) ChannelCombo.SelectedIndex = match;
             }
 
@@ -412,7 +447,7 @@ namespace EMP.UAHelper.WPF
         private string? SelectedWebhookUrl()
         {
             if (ChkOverrideChannel.IsChecked == true)
-                return ChannelCombo.SelectedValue as string;
+                return SelectedChannelUrl();
 
             // UA: Вироджений, але цілком можливий випадок: основний вебхук
             //     порожній (наприклад, у appsettings.json його стерли руками),
@@ -427,9 +462,21 @@ namespace EMP.UAHelper.WPF
             //     and the person would see "sent" with no Discord message at
             //     all. So we fall back to the first available channel.
             if (string.IsNullOrWhiteSpace(_settings.DiscordWebhookUrl))
-                return ChannelCombo.SelectedValue as string;
+                return SelectedChannelUrl();
 
             return null;
+        }
+
+        // UA: ChannelCombo зберігає лише назви (рядки) — див. коментар у
+        //     BuildChannelList(). Реальний URL береться з _channels за тим
+        //     самим індексом.
+        // EN: ChannelCombo only holds names (strings) — see the comment in
+        //     BuildChannelList(). The real URL is taken from _channels at
+        //     the same index.
+        private string? SelectedChannelUrl()
+        {
+            int i = ChannelCombo.SelectedIndex;
+            return (i >= 0 && i < _channels.Count) ? _channels[i].Url : null;
         }
 
         private async Task LoadCandidatesAsync()

@@ -249,10 +249,13 @@
             <StackPanel x:Name="PanelChannelPicker" Visibility="Collapsed" Margin="0,8,0,0">
                 <CheckBox x:Name="ChkOverrideChannel" Style="{StaticResource AutoCheckBox}"
                           Checked="ChkOverrideChannel_Changed" Unchecked="ChkOverrideChannel_Changed"/>
+                <!-- UA: Прив'язаний лише до назв (List of string) з коду-behind —
+                         дивись коментар у BuildChannelList() у .xaml.cs.
+                     EN: Bound only to names (List of string) from code-behind —
+                         see the comment in BuildChannelList() in the .xaml.cs. -->
                 <ComboBox x:Name="ChannelCombo" Visibility="Collapsed" Margin="0,6,0,0"
                           Style="{StaticResource ComboField}"
-                          ItemContainerStyle="{StaticResource ComboItemStyle}"
-                          DisplayMemberPath="Name" SelectedValuePath="Url"/>
+                          ItemContainerStyle="{StaticResource ComboItemStyle}"/>
                 <TextBlock x:Name="TxtChannelHint" Style="{StaticResource FieldHint}"/>
             </StackPanel>
 
