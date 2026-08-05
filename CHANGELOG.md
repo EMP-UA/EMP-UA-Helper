@@ -1,7 +1,7 @@
 # 📝 Історія версій / Changelog
 
-**UA:** Формат — [Keep a Changelog](https://keepachangelog.com/uk/1.0.0/), версії — [Semantic Versioning](https://semver.org/lang/uk/).
-**EN:** Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versions follow [Semantic Versioning](https://semver.org/).
+**UA:** Формат — [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/), версії — [Semantic Versioning](https://semver.org/lang/uk/).
+**EN:** Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
