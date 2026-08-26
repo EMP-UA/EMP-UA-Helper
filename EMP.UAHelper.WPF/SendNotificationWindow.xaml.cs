@@ -14,6 +14,7 @@
 using EMP.UAHelper.Core.Models;
 using EMP.UAHelper.Core.Services;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -32,6 +33,13 @@ using TextBox = System.Windows.Controls.TextBox;
 using Button = System.Windows.Controls.Button;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
+// UA: Той самий конфлікт WPF/WinForms, що описаний вище — OpenFileDialog
+//     також існує в обох просторах імен (System.Windows.Forms і
+//     Microsoft.Win32). Явно фіксуємо WPF-варіант.
+// EN: The same WPF/WinForms conflict described above — OpenFileDialog also
+//     exists in both namespaces (System.Windows.Forms and Microsoft.Win32).
+//     Pin the WPF variant explicitly.
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace EMP.UAHelper.WPF
 {
@@ -55,6 +63,18 @@ namespace EMP.UAHelper.WPF
         //     is where "list index -> real URL" is tracked. See the comment
         //     in BuildChannelList() for why.
         private List<DiscordWebhookTarget> _channels = new();
+
+        // UA: Локальні файли зображень, прикріплені в ручному режимі —
+        //     спільні для Telegram і Discord (одна галерея, обидві
+        //     платформи). Шляхи, не байти: файл читається лише в момент
+        //     фактичної відправки (DiscordService/TelegramService), тут
+        //     тримаємо мінімум пам'яті — самі лише рядки-шляхи
+        // EN: Local image files attached in manual mode — shared by
+        //     Telegram and Discord (one gallery, both platforms). Paths, not
+        //     bytes: the file is only read at actual send time
+        //     (DiscordService/TelegramService), here we keep the minimum —
+        //     just the path strings
+        private readonly List<string> _attachedImagePaths = new();
 
         // UA: Яке текстове поле зараз "слухає" спільний піквер дати/часу —
         //     призначається перед відкриттям відповідного Popup
@@ -174,6 +194,11 @@ namespace EMP.UAHelper.WPF
             ItemMentionRole.Content = _loc.Get("send.raw.mention.role");
             ItemMentionUser.Content = _loc.Get("send.raw.mention.user");
             ItemMentionChannel.Content = _loc.Get("send.raw.mention.channel");
+
+            TxtRawAttachLabel.Text = _loc.Get("send.raw.attach.label");
+            TxtRawAttachHint.Text = _loc.Get("send.raw.attach.hint");
+            BtnAttachImages.Content = _loc.Get("send.raw.attach.button");
+            TxtAttachSizeWarning.Text = _loc.Get("send.raw.attach.size_warning");
 
             ChkOverrideChannel.Content = _loc.Get("send.channel.override");
             TxtChannelHint.Text = _loc.Get("send.channel.hint");
@@ -477,6 +502,148 @@ namespace EMP.UAHelper.WPF
         {
             int i = ChannelCombo.SelectedIndex;
             return (i >= 0 && i < _channels.Count) ? _channels[i].Url : null;
+        }
+
+        // =====================================================================
+        // UA: Прикріплення зображень у ручному режимі — спільна галерея для
+        //     Telegram і Discord. Ліміт кількості (10) не наш вибір, а жорстка
+        //     межа Telegram-медіагрупи (TelegramService.MaxAttachmentsPerMessage);
+        //     Discord дозволяє більше, але єдина межа для обох платформ
+        //     зрозуміліша, ніж дві різні.
+        // EN: Image attachments in manual mode — one shared gallery for
+        //     Telegram and Discord. The count limit (10) isn't our choice —
+        //     it's Telegram's hard media-group limit
+        //     (TelegramService.MaxAttachmentsPerMessage); Discord allows more,
+        //     but one shared limit for both platforms is clearer than two
+        //     different ones.
+        // =====================================================================
+
+        // UA: М'який поріг попередження про розмір — не блокує відправку,
+        //     лише попереджає, бо реальний ліміт залежить від платформи й
+        //     навіть від рівня буста Discord-сервера (детальніше — коментарі
+        //     в DiscordService/TelegramService)
+        // EN: Soft size-warning threshold — doesn't block sending, just
+        //     warns, since the real limit depends on the platform and even on
+        //     the Discord server's boost level (see comments in
+        //     DiscordService/TelegramService for detail)
+        private const long WarnFileSizeBytes = 10 * 1024 * 1024;
+
+        private void BtnAttachImages_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Multiselect = true,
+                Filter = _loc.Get("send.raw.attach.filter")
+            };
+
+            if (dialog.ShowDialog() != true) return;
+
+            foreach (var path in dialog.FileNames)
+            {
+                if (_attachedImagePaths.Contains(path)) continue;
+                if (_attachedImagePaths.Count >= TelegramService.MaxAttachmentsPerMessage) break;
+                _attachedImagePaths.Add(path);
+            }
+
+            RebuildAttachmentGallery();
+        }
+
+        private void RebuildAttachmentGallery()
+        {
+            PanelAttachGallery.Children.Clear();
+            var oversized = false;
+
+            foreach (var path in _attachedImagePaths)
+            {
+                var item = new StackPanel { Width = 76, Margin = new Thickness(0, 0, 8, 8) };
+
+                var border = new Border
+                {
+                    Width = 72,
+                    Height = 72,
+                    BorderBrush = Brush("#3D2B5E"),
+                    BorderThickness = new Thickness(1),
+                    ClipToBounds = true
+                };
+
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(path, UriKind.Absolute);
+                    // UA: Локальні файли можуть бути значно більшими за
+                    //     будь-яке YouTube-прев'ю — обмежуємо декодований
+                    //     розмір, щоб мініатюра не з'їдала пам'ять і диск
+                    //     повністю на кожен скріншот у галереї
+                    // EN: Local files can be far larger than any YouTube
+                    //     thumbnail — cap the decoded size so a thumbnail
+                    //     doesn't eat memory/disk in full for every
+                    //     screenshot in the gallery
+                    bitmap.DecodePixelWidth = 144;
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+
+                    var image = new System.Windows.Controls.Image
+                    {
+                        Source = bitmap,
+                        Stretch = Stretch.UniformToFill,
+                        ToolTip = Path.GetFileName(path)
+                    };
+                    border.Child = image;
+                }
+                catch
+                {
+                    // UA: Файл видалили/пошкодили між вибором і рендером —
+                    //     показуємо позначку замість падіння вікна
+                    // EN: The file was removed/corrupted between selection and
+                    //     render — show a marker instead of crashing the window
+                    border.Child = new TextBlock
+                    {
+                        Text = "⚠",
+                        FontSize = 24,
+                        Foreground = Brush("#FFA500"),
+                        HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                }
+
+                if (TryGetFileSize(path) is long size && size > WarnFileSizeBytes)
+                    oversized = true;
+
+                var removeButton = new Button
+                {
+                    Content = "✕",
+                    Style = (Style)FindResource("LangButton"),
+                    Margin = new Thickness(0, 4, 0, 0),
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+                    ToolTip = _loc.Get("send.raw.attach.remove")
+                };
+                var capturedPath = path;
+                removeButton.Click += (_, _) =>
+                {
+                    _attachedImagePaths.Remove(capturedPath);
+                    RebuildAttachmentGallery();
+                };
+
+                item.Children.Add(border);
+                item.Children.Add(removeButton);
+                PanelAttachGallery.Children.Add(item);
+            }
+
+            BtnAttachImages.IsEnabled = _attachedImagePaths.Count < TelegramService.MaxAttachmentsPerMessage;
+            TxtAttachSizeWarning.Visibility = oversized ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // UA: Розмір файлу для м'якого попередження — файл міг зникнути з
+        //     диска між вибором і перебудовою галереї (той самий захист, що
+        //     й у catch вище), тому null замість винятку
+        // EN: File size for the soft warning — the file may have vanished
+        //     from disk between selection and gallery rebuild (the same
+        //     guard as the catch above), so null instead of an exception
+        private static long? TryGetFileSize(string path)
+        {
+            try { return new FileInfo(path).Length; }
+            catch { return null; }
         }
 
         private async Task LoadCandidatesAsync()
@@ -1342,7 +1509,7 @@ namespace EMP.UAHelper.WPF
             BtnSend.IsEnabled = false;
             try
             {
-                await _dispatcher.SendRawAsync(telegramText, discordText, SelectedWebhookUrl());
+                await _dispatcher.SendRawAsync(telegramText, discordText, SelectedWebhookUrl(), _attachedImagePaths);
                 System.Windows.MessageBox.Show(
                     _loc.Get("send.sent"), _loc.Get("app.name"),
                     MessageBoxButton.OK, MessageBoxImage.Information);

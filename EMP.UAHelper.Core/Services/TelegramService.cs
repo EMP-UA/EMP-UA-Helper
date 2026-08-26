@@ -8,6 +8,9 @@
 // EN: Service for sending notifications to a Telegram channel
 // =============================================================================
 using EMP.UAHelper.Core.Models;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types;
@@ -94,15 +97,86 @@ namespace EMP.UAHelper.Core.Services
         //     no tags are present, plain text is sent unchanged. Link preview
         //     is left to Telegram's own detection (we don't force a specific
         //     URL like in template mode)
-        public async Task SendRawAsync(string text)
+        //     imagePaths — необов'язкові локальні файли зображень (ручний
+        //     режим). 1 файл іде через sendPhoto з підписом; 2-10 — через
+        //     sendMediaGroup, де Telegram вимагає підпис лише на одному
+        //     елементі масиву (беремо перший — решта підпису не показують).
+        //     null/порожній список — той самий sendMessage, що й раніше.
+        //     imagePaths — optional local image files (manual mode). 1 file
+        //     goes through sendPhoto with a caption; 2-10 go through
+        //     sendMediaGroup, where Telegram requires the caption on exactly
+        //     one array item (we use the first — the rest show no caption).
+        //     null/empty means the same sendMessage as before.
+        public async Task SendRawAsync(string text, IReadOnlyList<string>? imagePaths = null)
         {
-            if (string.IsNullOrWhiteSpace(text)) return;
+            var hasImages = imagePaths is { Count: > 0 };
+            if (string.IsNullOrWhiteSpace(text) && !hasImages) return;
 
-            await _botClient.SendMessage(
-                chatId: _channelUsername,
-                text: text,
-                parseMode: ParseMode.Html
-            );
+            if (!hasImages)
+            {
+                await _botClient.SendMessage(
+                    chatId: _channelUsername,
+                    text: text,
+                    parseMode: ParseMode.Html
+                );
+                return;
+            }
+
+            if (imagePaths!.Count == 1)
+            {
+                await using var stream = File.OpenRead(imagePaths[0]);
+                await _botClient.SendPhoto(
+                    chatId: _channelUsername,
+                    photo: InputFile.FromStream(stream, Path.GetFileName(imagePaths[0])),
+                    caption: text,
+                    parseMode: ParseMode.Html
+                );
+                return;
+            }
+
+            // UA: 22.10.1 підтверджено через метадані складання — sendPhoto й
+            //     sendMediaGroup саме з такими параметрами, InputFile.FromStream
+            //     і InputMediaPhoto.Caption/ParseMode існують у цій версії
+            //     Telegram.Bot (dotnet SDK в пісочниці відсутній, тому
+            //     перевірено напряму по IL-метаданих DLL, а не з документації)
+            // EN: Confirmed against the assembly's own metadata for 22.10.1 —
+            //     sendPhoto and sendMediaGroup have exactly these parameters,
+            //     and InputFile.FromStream / InputMediaPhoto.Caption/ParseMode
+            //     exist in this Telegram.Bot version (no dotnet SDK in the
+            //     sandbox, so this was verified directly against the DLL's IL
+            //     metadata rather than from documentation)
+            var files = imagePaths.Take(MaxAttachmentsPerMessage).ToList();
+            var streams = files.Select(File.OpenRead).ToList();
+            try
+            {
+                var media = new List<InputMediaPhoto>();
+                for (var i = 0; i < files.Count; i++)
+                {
+                    var item = new InputMediaPhoto(InputFile.FromStream(streams[i], Path.GetFileName(files[i])));
+                    if (i == 0)
+                    {
+                        item.Caption = text;
+                        item.ParseMode = ParseMode.Html;
+                    }
+
+                    media.Add(item);
+                }
+
+                await _botClient.SendMediaGroup(chatId: _channelUsername, media: media);
+            }
+            finally
+            {
+                foreach (var stream in streams)
+                    stream.Dispose();
+            }
         }
+
+        // UA: Telegram дозволяє щонайбільше 10 елементів у медіа-групі — це
+        //     жорсткий ліміт самого API, не вибір UI (на відміну від
+        //     аналогічної константи в DiscordService)
+        // EN: Telegram allows at most 10 items in a media group — this is a
+        //     hard API limit, not a UI choice (unlike the equivalent constant
+        //     in DiscordService)
+        public const int MaxAttachmentsPerMessage = 10;
     }
 }

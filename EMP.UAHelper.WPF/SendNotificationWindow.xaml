@@ -611,6 +611,28 @@
                     </StackPanel>
                 </StackPanel>
 
+                <!-- UA: Прикріплення зображень — спільне для Telegram і Discord,
+                         надсилається разом із текстом кожної платформи (не
+                         замінює правило "порожнє поле = не сюди", дивись
+                         коментар у NotificationDispatcher.SendRawAsync).
+                         Лише вибір через провідник, до 10 файлів — Telegram
+                         не дозволяє більше в одній медіа-групі
+                     EN: Image attachments — shared by Telegram and Discord,
+                         sent together with each platform's text (doesn't
+                         override the "empty field = not here" rule, see the
+                         comment in NotificationDispatcher.SendRawAsync). File
+                         browser selection only, up to 10 files — Telegram
+                         doesn't allow more in a single media group -->
+                <StackPanel Margin="0,16,0,0">
+                    <TextBlock x:Name="TxtRawAttachLabel" Style="{StaticResource FieldLabel}"/>
+                    <TextBlock x:Name="TxtRawAttachHint" Style="{StaticResource FieldHint}"/>
+                    <WrapPanel x:Name="PanelAttachGallery" Margin="0,4,0,0"/>
+                    <Button x:Name="BtnAttachImages" Style="{StaticResource LangButton}"
+                            HorizontalAlignment="Left" Margin="0,4,0,0" Click="BtnAttachImages_Click"/>
+                    <TextBlock x:Name="TxtAttachSizeWarning" Style="{StaticResource FieldHint}"
+                               Foreground="#FFA500" Visibility="Collapsed" Margin="0,6,0,0"/>
+                </StackPanel>
+
                 <TextBlock x:Name="TxtRawEmpty" Style="{StaticResource FieldHint}" Visibility="Collapsed"/>
 
             </StackPanel>

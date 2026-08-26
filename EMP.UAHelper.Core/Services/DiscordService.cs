@@ -9,8 +9,10 @@
 // =============================================================================
 using EMP.UAHelper.Core.Models;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -193,13 +195,100 @@ namespace EMP.UAHelper.Core.Services
         //     <@userId> — user, <#channelId> — channel, @everyone/@here) when
         //     they're present directly in the text — no extra code needed.
         //     Discord's content length limit is 2000 characters
-        public async Task SendRawAsync(string text, string? webhookUrl = null)
+        //     imagePaths — необов'язкові локальні файли зображень для
+        //     прикріплення (ручний режим, вибираються через провідник).
+        //     null/порожній список — поведінка не змінюється, той самий
+        //     JSON-запит, що й раніше.
+        //     imagePaths — optional local image files to attach (manual mode,
+        //     picked via the file browser). null/empty means unchanged
+        //     behavior — the same plain JSON request as before.
+        public async Task SendRawAsync(string text, string? webhookUrl = null,
+                                        IReadOnlyList<string>? imagePaths = null)
         {
-            if (string.IsNullOrWhiteSpace(text)) return;
+            var hasImages = imagePaths is { Count: > 0 };
+            if (string.IsNullOrWhiteSpace(text) && !hasImages) return;
 
-            var payload = new Dictionary<string, object> { ["content"] = text };
-            await PostAsync(payload, webhookUrl);
+            if (!hasImages)
+            {
+                var payload = new Dictionary<string, object> { ["content"] = text };
+                await PostAsync(payload, webhookUrl);
+                return;
+            }
+
+            await PostWithAttachmentsAsync(text, imagePaths!, webhookUrl);
         }
+
+        // UA: Скільки файлів можна прикріпити до одного повідомлення. Discord
+        //     сам дозволяє більше, але це число навмисно узгоджене з
+        //     Telegram-обмеженням на медіа-групу (2-10) — той самий набір
+        //     файлів у ручному режимі йде в обидві платформи одночасно, і
+        //     єдина межа в UI зрозуміліша, ніж дві різні.
+        // EN: How many files can be attached to a single message. Discord
+        //     itself allows more, but this number is deliberately aligned
+        //     with Telegram's media-group limit (2-10) — the same set of
+        //     files goes to both platforms at once in manual mode, and one
+        //     shared UI limit is clearer than two different ones.
+        public const int MaxAttachmentsPerMessage = 10;
+
+        // UA: Multipart-запит з вкладеннями. Discord Webhook API вимагає
+        //     саме такої форми (не звичайний JSON) для файлів: текстова
+        //     частина йде в полі "payload_json", кожен файл — в окремому полі
+        //     "files[N]" (N з нуля). Потоки читання файлів тримаємо відкритими
+        //     до завершення запиту й закриваємо в finally — HttpClient читає
+        //     їх лінькво під час відправки, а не наперед у пам'ять.
+        // EN: A multipart request with attachments. The Discord Webhook API
+        //     requires exactly this shape (not plain JSON) for files: the
+        //     text part goes in the "payload_json" field, each file in its
+        //     own "files[N]" field (N starting at zero). File streams are
+        //     kept open until the request completes and disposed in finally —
+        //     HttpClient reads them lazily while sending, not all into memory upfront.
+        private async Task PostWithAttachmentsAsync(string text, IReadOnlyList<string> imagePaths, string? webhookUrl)
+        {
+            var target = string.IsNullOrWhiteSpace(webhookUrl) ? _webhookUrl : webhookUrl;
+            if (string.IsNullOrWhiteSpace(target)) return;
+
+            var files = imagePaths.Take(MaxAttachmentsPerMessage).ToList();
+            var payloadJson = JsonSerializer.Serialize(new Dictionary<string, object> { ["content"] = text });
+
+            using var form = new MultipartFormDataContent();
+            form.Add(new StringContent(payloadJson, Encoding.UTF8, "application/json"), "payload_json");
+
+            var streams = new List<FileStream>();
+            try
+            {
+                for (var i = 0; i < files.Count; i++)
+                {
+                    var stream = File.OpenRead(files[i]);
+                    streams.Add(stream);
+
+                    var streamContent = new StreamContent(stream);
+                    streamContent.Headers.ContentType = new MediaTypeHeaderValue(GuessImageMimeType(files[i]));
+                    form.Add(streamContent, $"files[{i}]", Path.GetFileName(files[i]));
+                }
+
+                await Http.PostAsync(target, form);
+            }
+            finally
+            {
+                foreach (var stream in streams)
+                    stream.Dispose();
+            }
+        }
+
+        // UA: MIME-тип за розширенням файлу — цього достатньо, бо файли сюди
+        //     потрапляють лише через діалог вибору файлу з фільтром за
+        //     зображеннями (SendNotificationWindow), а не з довільного джерела
+        // EN: MIME type from the file extension — sufficient here, since files
+        //     only reach this point via the image-filtered file picker dialog
+        //     (SendNotificationWindow), not from an arbitrary source
+        private static string GuessImageMimeType(string filePath) => Path.GetExtension(filePath).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".bmp" => "image/bmp",
+            _ => "image/jpeg"
+        };
 
         // UA: Єдина точка відправки в Discord. Раніше і embed, і ручне
         //     повідомлення дублювали серіалізацію та створення HttpClient —

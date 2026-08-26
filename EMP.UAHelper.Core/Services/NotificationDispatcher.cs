@@ -60,17 +60,30 @@ namespace EMP.UAHelper.Core.Services
         //     own text independently. An empty/whitespace text for a
         //     platform means "don't send there" — this is intentional (e.g.
         //     when the announcement is only needed on Discord)
+        //     imagePaths — необов'язкові локальні зображення, спільні для
+        //     обох платформ (ручний режим). Правило "порожній текст = не
+        //     відправляти туди" лишається чинним і для зображень — вкладення
+        //     їдуть лише разом із текстом, а не замість нього. Це свідомо:
+        //     інакше порожнє поле Telegram/Discord перестало б означати
+        //     "сюди не надсилати", якщо галерея не порожня.
+        //     imagePaths — optional local images shared by both platforms
+        //     (manual mode). The "empty text = don't send there" rule still
+        //     applies with images — attachments ride along with the text,
+        //     they don't replace it. This is deliberate: otherwise an empty
+        //     Telegram/Discord field would stop meaning "don't send here"
+        //     whenever the gallery isn't empty.
         public async Task SendRawAsync(string? telegramText, string? discordText,
-                                       string? discordWebhookUrl = null)
+                                       string? discordWebhookUrl = null,
+                                       IReadOnlyList<string>? imagePaths = null)
         {
             await _crashLogService.LogInfoAsync(
-                $"[RAW] telegram={(string.IsNullOrWhiteSpace(telegramText) ? "no" : "yes")}, discord={(string.IsNullOrWhiteSpace(discordText) ? "no" : "yes")}");
+                $"[RAW] telegram={(string.IsNullOrWhiteSpace(telegramText) ? "no" : "yes")}, discord={(string.IsNullOrWhiteSpace(discordText) ? "no" : "yes")}, images={imagePaths?.Count ?? 0}");
 
             var tasks = new List<Task>();
             if (_telegramService != null && !string.IsNullOrWhiteSpace(telegramText))
-                tasks.Add(_telegramService.SendRawAsync(telegramText));
+                tasks.Add(_telegramService.SendRawAsync(telegramText, imagePaths));
             if (_discordService != null && !string.IsNullOrWhiteSpace(discordText))
-                tasks.Add(_discordService.SendRawAsync(discordText, discordWebhookUrl));
+                tasks.Add(_discordService.SendRawAsync(discordText, discordWebhookUrl, imagePaths));
 
             await Task.WhenAll(tasks);
         }
