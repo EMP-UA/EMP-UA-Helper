@@ -1,0 +1,172 @@
+# =============================================================================
+# UA: Автозбірка релізу. Запускається:
+#       - при пуші тегу vX.Y.Z (наприклад v1.5.0);
+#       - вручну (Actions -> Release -> Run workflow, або
+#         `gh workflow run release.yml -f tag=vX.Y.Z`) для вже наявного тегу.
+#     Збирає три варіанти GUI, кожен окремим зіпом:
+#       - generic  — потребує встановленого .NET 10 Desktop Runtime;
+#       - win-x64  — self-contained, один exe, Windows 64-bit;
+#       - win-x86  — self-contained, один exe, Windows 32-bit.
+#     Кожен зіп містить лише програму, README.md і LICENSE. Перед
+#     запакуванням окремий крок гарантовано перевіряє, що в публікації немає
+#     appsettings.json, templates.json, content-cache.json, *.pdb чи logs/ —
+#     усе це локальне й не повинне потрапити в реліз. Усі три зіпи
+#     прикріплюються до одного GitHub Release. Опис Release — розділ
+#     `**vX.Y.Z**` з CHANGELOG.md цього тегу; якщо розділу немає, збірка
+#     зупиняється.
+# EN: Auto-builds a release. Triggered:
+#       - by pushing a vX.Y.Z tag (e.g. v1.5.0);
+#       - manually (Actions -> Release -> Run workflow, or
+#         `gh workflow run release.yml -f tag=vX.Y.Z`) for an existing tag.
+#     Builds three GUI variants, each as its own zip:
+#       - generic  — requires the .NET 10 Desktop Runtime to be installed;
+#       - win-x64  — self-contained, single exe, Windows 64-bit;
+#       - win-x86  — self-contained, single exe, Windows 32-bit.
+#     Each zip contains only the application, README.md and LICENSE. Before
+#     zipping, a dedicated step guarantees the publish output contains no
+#     appsettings.json, templates.json, content-cache.json, *.pdb or logs/ —
+#     all of those are local-only and must never reach a release. All three
+#     zips are attached to a single GitHub Release. The Release description
+#     is the `**vX.Y.Z**` section of that tag's CHANGELOG.md; the build stops
+#     if the section is missing.
+# =============================================================================
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and publish (vX.Y.Z) / Наявний тег (vX.Y.Z)"
+        required: true
+        type: string
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - variant: generic
+            publish_args: "--self-contained false"
+          - variant: win-x64
+            publish_args: "-r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true"
+          - variant: win-x86
+            publish_args: "-r win-x86 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true"
+    steps:
+      - name: Validate tag / Перевірка тегу
+        shell: pwsh
+        run: |
+          if ($env:TAG -notmatch '^v\d+\.\d+\.\d+$') { throw "Tag '$env:TAG' does not match vX.Y.Z" }
+
+      - name: Checkout / Клонування
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore EMP.UAHelper.WPF/EMP.UAHelper.WPF.csproj
+
+      - name: Publish GUI (${{ matrix.variant }})
+        shell: pwsh
+        run: >
+          dotnet publish EMP.UAHelper.WPF/EMP.UAHelper.WPF.csproj
+          -c Release ${{ matrix.publish_args }}
+          -o "publish/${{ matrix.variant }}"
+
+      - name: Add README / LICENSE, drop debug symbols
+        shell: pwsh
+        run: |
+          Copy-Item README.md, LICENSE "publish/${{ matrix.variant }}"
+          Remove-Item "publish/${{ matrix.variant }}/*.pdb" -ErrorAction SilentlyContinue
+
+      # UA: Обов'язкова перевірка перед запакуванням — реальні налаштування,
+      #     персональні шаблони, локальний кеш, символи відлагодження чи логи
+      #     ніколи не повинні потрапити в публічний zip. Якщо щось із цього
+      #     знайдено — збірка падає, а не мовчки публікується.
+      # EN: Mandatory check before zipping — real settings, personal
+      #     templates, the local cache, debug symbols or logs must never end
+      #     up in the public zip. If any of this is found, the build fails
+      #     instead of silently publishing.
+      - name: Verify no secrets or debug artifacts / Перевірка на відсутність секретів і дебагу
+        shell: pwsh
+        run: |
+          $publishDir = "publish/${{ matrix.variant }}"
+          $forbiddenFiles = @("appsettings.json", "templates.json", "content-cache.json")
+          $found = @()
+
+          foreach ($name in $forbiddenFiles) {
+            $found += Get-ChildItem -Path $publishDir -Recurse -Filter $name -ErrorAction SilentlyContinue
+          }
+          $found += Get-ChildItem -Path $publishDir -Recurse -Filter "*.pdb" -ErrorAction SilentlyContinue
+          $found += Get-ChildItem -Path $publishDir -Recurse -Directory -Filter "logs" -ErrorAction SilentlyContinue
+
+          if ($found.Count -gt 0) {
+            Write-Host "Заборонені файли/папки в публікації / Forbidden files or folders in the publish output:"
+            $found | ForEach-Object { Write-Host " - $($_.FullName)" }
+            throw "Release blocked: forbidden file(s) found in publish/${{ matrix.variant }}"
+          }
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Compress-Archive -Path "publish/${{ matrix.variant }}/*" `
+            -DestinationPath "dist/EMP-UA-Helper_$($env:TAG)_${{ matrix.variant }}.zip"
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: zip-${{ matrix.variant }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout / Клонування
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          version="${TAG#v}"
+          awk -v h="**v${version}**" 'index($0, h) == 1 { found = 1; next }
+                                      found && /^\*\*v[0-9]/ { exit }
+                                      found' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "CHANGELOG.md has no non-empty '**v${version}**' section" >&2
+            exit 1
+          fi
+
+      - name: Download all ZIP artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: zip-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.TAG }}
+          body_path: release-notes.md
+          files: dist/*.zip

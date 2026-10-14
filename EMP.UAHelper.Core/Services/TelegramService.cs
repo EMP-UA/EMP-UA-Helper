@@ -24,10 +24,10 @@ namespace EMP.UAHelper.Core.Services
         private readonly string _twitchUrl;
         private readonly TemplateService _templateService;
 
-        // UA: Резолвиться один раз при побудові сервісу (через AppTimeZone,
-        //     без хардкоду) — сервіс і так перестворюється при кожній зміні
-        //     налаштувань (див. ContentDispatchFactory), тож "застаріла" зона
-        //     тут неможлива
+        // UA: Резолвиться один раз під час побудови сервісу (через AppTimeZone,
+        //     без хардкоду) — сервіс і так перестворюється щоразу, коли
+        //     змінюються налаштування (див. ContentDispatchFactory), тож
+        //     "застаріла" зона тут неможлива
         // EN: Resolved once when the service is built (via AppTimeZone, no
         //     hardcoding) — the service is already recreated on every
         //     settings change (see ContentDispatchFactory), so a "stale"
@@ -44,9 +44,19 @@ namespace EMP.UAHelper.Core.Services
             _templateService = templateService;
         }
 
-        // UA: Відправити сповіщення залежно від типу контенту
-        // EN: Send notification depending on content type
-        public async Task SendNotificationAsync(VideoInfo video)
+        // UA: Відправити сповіщення залежно від типу контенту.
+        //     Повертає ID відправленого повідомлення Telegram як рядок —
+        //     підтвердження реальної відправки. На відміну від Discord-вебхука,
+        //     Telegram Bot API синхронний: якщо await завершився без винятку
+        //     (напр. ApiRequestException при 429 "Too Many Requests"), повідомлення
+        //     вже гарантовано доставлене — тут достатньо просто повернути MessageId.
+        // EN: Send notification depending on content type.
+        //     Returns the sent Telegram message's ID as a string — confirmation
+        //     of an actual send. Unlike Discord's webhook, the Telegram Bot API
+        //     is synchronous: if the await completes without throwing (e.g. an
+        //     ApiRequestException on a 429 "Too Many Requests"), the message is
+        //     already guaranteed delivered — just returning MessageId is enough.
+        public async Task<string> SendNotificationAsync(VideoInfo video)
         {
             var templates = _templateService.GetTemplates().Telegram;
 
@@ -71,7 +81,7 @@ namespace EMP.UAHelper.Core.Services
                 _timeZone,
                 video.ScheduledStartTime);
 
-            await _botClient.SendMessage(
+            var message = await _botClient.SendMessage(
                 chatId: _channelUsername,
                 text: text,
                 parseMode: ParseMode.Html,
@@ -83,6 +93,8 @@ namespace EMP.UAHelper.Core.Services
                     ShowAboveText = true
                 }
             );
+
+            return message.MessageId.ToString();
         }
 
         // UA: Повністю ручна відправка — без TemplateService, текст іде як є.
@@ -107,31 +119,37 @@ namespace EMP.UAHelper.Core.Services
         //     sendMediaGroup, where Telegram requires the caption on exactly
         //     one array item (we use the first — the rest show no caption).
         //     null/empty means the same sendMessage as before.
-        public async Task SendRawAsync(string text, IReadOnlyList<string>? imagePaths = null)
+        //     Повертає ID(и) надісланого повідомлення (чи кількох — для медіа-
+        //     групи) як рядок, або null, якщо не було ні тексту, ні зображень
+        //     (відправка взагалі не відбувалась).
+        //     Returns the sent message's ID(s) (several, for a media group) as
+        //     a string, or null if there was neither text nor images (nothing
+        //     was sent at all).
+        public async Task<string?> SendRawAsync(string text, IReadOnlyList<string>? imagePaths = null)
         {
             var hasImages = imagePaths is { Count: > 0 };
-            if (string.IsNullOrWhiteSpace(text) && !hasImages) return;
+            if (string.IsNullOrWhiteSpace(text) && !hasImages) return null;
 
             if (!hasImages)
             {
-                await _botClient.SendMessage(
+                var sent = await _botClient.SendMessage(
                     chatId: _channelUsername,
                     text: text,
                     parseMode: ParseMode.Html
                 );
-                return;
+                return sent.MessageId.ToString();
             }
 
             if (imagePaths!.Count == 1)
             {
                 await using var stream = File.OpenRead(imagePaths[0]);
-                await _botClient.SendPhoto(
+                var sent = await _botClient.SendPhoto(
                     chatId: _channelUsername,
                     photo: InputFile.FromStream(stream, Path.GetFileName(imagePaths[0])),
                     caption: text,
                     parseMode: ParseMode.Html
                 );
-                return;
+                return sent.MessageId.ToString();
             }
 
             // UA: 22.10.1 підтверджено через метадані складання — sendPhoto й
@@ -146,9 +164,27 @@ namespace EMP.UAHelper.Core.Services
             //     sandbox, so this was verified directly against the DLL's IL
             //     metadata rather than from documentation)
             var files = imagePaths.Take(MaxAttachmentsPerMessage).ToList();
-            var streams = files.Select(File.OpenRead).ToList();
+
+            // UA: Потоки відкриваються ОДИН ЗА ОДНИМ усередині try, а не разом
+            //     через .Select(File.OpenRead).ToList() до try — інакше, якщо
+            //     відкриття, скажімо, третього файлу кине виняток (видалили з
+            //     диска між вибором у галереї й відправкою, немає прав
+            //     доступу), два вже відкриті дескриптори першого й другого
+            //     файлів ніхто не закриє: виняток стався ще ДО входу в
+            //     try/finally, що їх звільняє.
+            // EN: Streams are opened ONE AT A TIME inside the try, not all at
+            //     once via .Select(File.OpenRead).ToList() before the try —
+            //     otherwise, if opening, say, the third file throws (removed
+            //     from disk between the gallery pick and sending, no access
+            //     rights), the two already-open handles for the first and
+            //     second files are never released: the exception happens
+            //     BEFORE entering the try/finally that disposes them.
+            var streams = new List<FileStream>();
             try
             {
+                foreach (var file in files)
+                    streams.Add(File.OpenRead(file));
+
                 var media = new List<InputMediaPhoto>();
                 for (var i = 0; i < files.Count; i++)
                 {
@@ -162,7 +198,8 @@ namespace EMP.UAHelper.Core.Services
                     media.Add(item);
                 }
 
-                await _botClient.SendMediaGroup(chatId: _channelUsername, media: media);
+                var sent = await _botClient.SendMediaGroup(chatId: _channelUsername, media: media);
+                return string.Join(",", sent.Select(m => m.MessageId));
             }
             finally
             {
@@ -178,5 +215,43 @@ namespace EMP.UAHelper.Core.Services
         //     hard API limit, not a UI choice (unlike the equivalent constant
         //     in DiscordService)
         public const int MaxAttachmentsPerMessage = 10;
+
+        // UA: Перевірка з'єднання БЕЗ фактичної відправки — щоб проблему зі
+        //     з'єднанням було видно ще до натискання "Надіслати", а не
+        //     постфактум. GetMe() підтверджує, що токен бота взагалі
+        //     дійсний; GetChat() окремо підтверджує, що саме ЦЕЙ бот бачить
+        //     саме ЦЕЙ канал (ловить, наприклад, друкарську помилку в
+        //     username каналу — валідний токен тут нічого не гарантує).
+        //     Обидва виклики — легкі, лише читають інформацію, нічого не
+        //     публікують і не видно жодному підписнику каналу.
+        // EN: A connection check WITHOUT an actual send — so a connectivity
+        //     problem is visible before "Send" is pressed, not after the
+        //     fact. GetMe() confirms the bot token is valid at all; GetChat()
+        //     separately confirms THIS bot can see THIS channel (catches,
+        //     say, a typo in the channel username — a valid token guarantees
+        //     nothing there). Both calls are lightweight, read-only, post
+        //     nothing, and are invisible to any channel subscriber.
+        public async Task<(bool Ok, string? Error)> CheckConnectionAsync()
+        {
+            try
+            {
+                await _botClient.GetMe();
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Telegram: {ex.Message}");
+            }
+
+            try
+            {
+                await _botClient.GetChat(_channelUsername);
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Telegram ({_channelUsername}): {ex.Message}");
+            }
+
+            return (true, null);
+        }
     }
 }

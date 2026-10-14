@@ -101,6 +101,17 @@
             <Setter Property="Margin" Value="0,4,0,8"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
+
+        <!-- UA: Лічильник символів під полем шаблону — колір міняє код-бехайнд
+                 (SetCharCount), тут лише базовий вигляд
+             EN: Character counter under a template field — code-behind
+                 (SetCharCount) changes the color, this is just the base look -->
+        <Style x:Key="CounterText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#6A5A80"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="18">
@@ -154,21 +165,29 @@
                                    Style="{StaticResource SectionHeader}"/>
                         <TextBox x:Name="TgLive"
                                  Style="{StaticResource BodyBox}"/>
+                        <TextBlock x:Name="TgLiveCounter"
+                                   Style="{StaticResource CounterText}"/>
 
                         <TextBlock x:Name="TxtTgUpcoming"
                                    Style="{StaticResource SectionHeader}"/>
                         <TextBox x:Name="TgUpcoming"
                                  Style="{StaticResource BodyBox}"/>
+                        <TextBlock x:Name="TgUpcomingCounter"
+                                   Style="{StaticResource CounterText}"/>
 
                         <TextBlock x:Name="TxtTgVideo"
                                    Style="{StaticResource SectionHeader}"/>
                         <TextBox x:Name="TgVideo"
                                  Style="{StaticResource BodyBox}"/>
+                        <TextBlock x:Name="TgVideoCounter"
+                                   Style="{StaticResource CounterText}"/>
 
                         <TextBlock x:Name="TxtTgShort"
                                    Style="{StaticResource SectionHeader}"/>
                         <TextBox x:Name="TgShort"
                                  Style="{StaticResource BodyBox}"/>
+                        <TextBlock x:Name="TgShortCounter"
+                                   Style="{StaticResource CounterText}"/>
 
                     </StackPanel>
                 </ScrollViewer>
@@ -185,10 +204,14 @@
                                    Style="{StaticResource SubLabel}"/>
                         <TextBox x:Name="DcTitleLive"
                                  Style="{StaticResource TitleBox}"/>
+                        <TextBlock x:Name="DcTitleLiveCounter"
+                                   Style="{StaticResource CounterText}"/>
                         <TextBlock x:Name="TxtDcLiveBodyLabel"
                                    Style="{StaticResource SubLabel}"/>
                         <TextBox x:Name="DcLive"
                                  Style="{StaticResource BodyBox}"/>
+                        <TextBlock x:Name="DcLiveCounter"
+                                   Style="{StaticResource CounterText}"/>
 
                         <TextBlock x:Name="TxtDcUpcoming"
                                    Style="{StaticResource SectionHeader}"/>
@@ -196,10 +219,14 @@
                                    Style="{StaticResource SubLabel}"/>
                         <TextBox x:Name="DcTitleUpcoming"
                                  Style="{StaticResource TitleBox}"/>
+                        <TextBlock x:Name="DcTitleUpcomingCounter"
+                                   Style="{StaticResource CounterText}"/>
                         <TextBlock x:Name="TxtDcUpcomingBodyLabel"
                                    Style="{StaticResource SubLabel}"/>
                         <TextBox x:Name="DcUpcoming"
                                  Style="{StaticResource BodyBox}"/>
+                        <TextBlock x:Name="DcUpcomingCounter"
+                                   Style="{StaticResource CounterText}"/>
 
                         <TextBlock x:Name="TxtDcVideo"
                                    Style="{StaticResource SectionHeader}"/>
@@ -207,10 +234,14 @@
                                    Style="{StaticResource SubLabel}"/>
                         <TextBox x:Name="DcTitleVideo"
                                  Style="{StaticResource TitleBox}"/>
+                        <TextBlock x:Name="DcTitleVideoCounter"
+                                   Style="{StaticResource CounterText}"/>
                         <TextBlock x:Name="TxtDcVideoBodyLabel"
                                    Style="{StaticResource SubLabel}"/>
                         <TextBox x:Name="DcVideo"
                                  Style="{StaticResource BodyBox}"/>
+                        <TextBlock x:Name="DcVideoCounter"
+                                   Style="{StaticResource CounterText}"/>
 
                         <TextBlock x:Name="TxtDcShort"
                                    Style="{StaticResource SectionHeader}"/>
@@ -218,10 +249,14 @@
                                    Style="{StaticResource SubLabel}"/>
                         <TextBox x:Name="DcTitleShort"
                                  Style="{StaticResource TitleBox}"/>
+                        <TextBlock x:Name="DcTitleShortCounter"
+                                   Style="{StaticResource CounterText}"/>
                         <TextBlock x:Name="TxtDcShortBodyLabel"
                                    Style="{StaticResource SubLabel}"/>
                         <TextBox x:Name="DcShort"
                                  Style="{StaticResource BodyBox}"/>
+                        <TextBlock x:Name="DcShortCounter"
+                                   Style="{StaticResource CounterText}"/>
 
                     </StackPanel>
                 </ScrollViewer>

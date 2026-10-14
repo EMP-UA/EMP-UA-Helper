@@ -96,6 +96,22 @@ namespace EMP.UAHelper.Core.Services
         //     is empty by default, so nothing changes for existing installs:
         //     the primary channel behaves exactly as before.
         public List<DiscordWebhookTarget> DiscordExtraWebhooks { get; set; } = new();
+
+        // UA: Збережені іменовані ролі Discord (назва + ID) — для швидкого
+        //     вибору в генераторі згадок у вікні ручної відправки, замість
+        //     введення "голого" ID наосліп щоразу. Існуюче поле DiscordRoleId
+        //     (вище) НЕ пов'язане з цим списком і лишається незмінним — воно
+        //     й далі відповідає лише за автоматичний пінг ролі в шаблонних
+        //     сповіщеннях. Список порожній за замовчуванням, тож для наявних
+        //     інсталяцій нічого не змінюється.
+        // EN: Saved named Discord roles (name + ID) — for quick selection in
+        //     the mention generator in the manual-send window, instead of
+        //     blindly typing a "bare" ID every time. The existing
+        //     DiscordRoleId field (above) is NOT tied to this list and stays
+        //     unchanged — it still only drives the automatic role ping in
+        //     template notifications. The list is empty by default, so
+        //     nothing changes for existing installs.
+        public List<DiscordRoleTarget> DiscordRoles { get; set; } = new();
     }
 
     // UA: Іменований Discord-канал. Окремий клас, а не пара рядків, бо
@@ -108,6 +124,18 @@ namespace EMP.UAHelper.Core.Services
     {
         public string Name { get; set; } = string.Empty;
         public string Url { get; set; } = string.Empty;
+    }
+
+    // UA: Іменована роль Discord (назва + "голий" числовий ID) — той самий
+    //     підхід, що й у DiscordWebhookTarget вище, заради однакового
+    //     зв'язування Microsoft.Extensions.Configuration
+    // EN: A named Discord role (name + "bare" numeric ID) — the same
+    //     approach as DiscordWebhookTarget above, for the same
+    //     Microsoft.Extensions.Configuration binding
+    public class DiscordRoleTarget
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Id { get; set; } = string.Empty;
     }
 
     public class ConfigurationService

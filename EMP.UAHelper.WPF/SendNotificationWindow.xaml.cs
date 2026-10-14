@@ -64,6 +64,14 @@ namespace EMP.UAHelper.WPF
         //     in BuildChannelList() for why.
         private List<DiscordWebhookTarget> _channels = new();
 
+        // UA: Збережені ролі Discord (⚙️ Налаштування → Discord → Ролі) —
+        //     для пікера в генераторі згадок. Та сама ідея, що й у _channels
+        //     вище: тут лише ті записи, в яких реально є ID, без порожніх
+        // EN: Saved Discord roles (⚙️ Settings → Discord → Roles) — for the
+        //     picker in the mention generator. Same idea as _channels above:
+        //     only entries that actually have an ID, no empty ones
+        private List<DiscordRoleTarget> _roles = new();
+
         // UA: Локальні файли зображень, прикріплені в ручному режимі —
         //     спільні для Telegram і Discord (одна галерея, обидві
         //     платформи). Шляхи, не байти: файл читається лише в момент
@@ -83,6 +91,36 @@ namespace EMP.UAHelper.WPF
         //     corresponding Popup
         private TextBox? _dateTarget;
         private TextBox? _timeTarget;
+
+        // UA: Результат і "відбиток" вмісту останньої спроби відправки в
+        //     цьому вікні — потрібні для захисту від дублів: якщо людина
+        //     натискає "Надіслати" ще раз БЕЗ зміни вмісту, платформи, що
+        //     вже підтвердили успіх минулого разу, не повинні мовчки
+        //     отримати повідомлення вдруге. null = ще жодної спроби не було
+        //     в цьому вікні.
+        // EN: The result and content "fingerprint" of the last send attempt
+        //     in this window — needed for duplicate protection: if the
+        //     person presses "Send" again WITHOUT changing the content,
+        //     platforms that already confirmed success last time shouldn't
+        //     silently receive the message a second time. null = no attempt
+        //     has been made yet in this window.
+        private SendResult? _lastSendResult;
+        private string? _lastSendSignature;
+
+        // UA: Результат останньої перевірки з'єднання (GetMe/GetChat для
+        //     Telegram, GET вебхука для Discord) — читається з
+        //     ApplyLocalization під час зміни мови, щоб перекласти вже
+        //     показаний результат, а не повторювати мережевий запит.
+        //     _connChecked лишається false, доки перша перевірка не
+        //     завершиться хоч раз.
+        // EN: The result of the last connection check (GetMe/GetChat for
+        //     Telegram, webhook GET for Discord) — read back by
+        //     ApplyLocalization on a language switch, to translate the
+        //     already-shown result instead of repeating the network call.
+        //     _connChecked stays false until the first check has completed
+        //     at least once.
+        private SendResult? _lastConnResult;
+        private bool _connChecked;
 
         private class CandidateItem
         {
@@ -132,13 +170,18 @@ namespace EMP.UAHelper.WPF
             TypeCombo.SelectedIndex = 0;
 
             // UA: Списки годин/хвилин для спливного пікера часу — 00-23 і
-            //     00-59, один раз при побудові вікна
+            //     00-59, один раз під час побудови вікна
             // EN: Hour/minute lists for the time picker popup — 00-23 and
             //     00-59, built once when the window is constructed
             HourCombo.ItemsSource = Enumerable.Range(0, 24).Select(h => h.ToString("00")).ToList();
             MinuteCombo.ItemsSource = Enumerable.Range(0, 60).Select(m => m.ToString("00")).ToList();
 
             MentionTypeCombo.SelectedIndex = 0;
+            UpdateCharCounters();
+
+            ApplyTextFilter(TitleInput);
+            ApplyTextFilter(RawTelegramInput);
+            ApplyTextFilter(RawDiscordInput);
 
             if (_youTubeService != null)
             {
@@ -153,6 +196,14 @@ namespace EMP.UAHelper.WPF
                 _isReady = true;
                 UpdatePreview();
             }
+
+            // UA: Перевірка з'єднання стартує одразу під час відкриття вікна —
+            //     fire-and-forget, той самий підхід, що й у LoadCandidatesAsync
+            //     вище: вікно не блокується в очікуванні мережевого запиту
+            // EN: Connection check starts right when the window opens —
+            //     fire-and-forget, same approach as LoadCandidatesAsync
+            //     above: the window isn't blocked waiting on the network call
+            _ = RunConnectionCheckAsync();
         }
 
         private void ApplyLocalization()
@@ -174,6 +225,24 @@ namespace EMP.UAHelper.WPF
             TxtThumbnailNote.Text = _loc.Get("send.thumbnail.twitch_note");
             BtnSend.Content = _loc.Get("send.button");
 
+            BtnRecheckConnection.ToolTip = _loc.Get("send.conn.recheck_tooltip");
+            // UA: Текст рядків з'єднання оновлюється лише якщо перевірка вже
+            //     бодай раз відбулась — інакше перший виклик ApplyLocalization
+            //     (у конструкторі) перезапише щойно встановлений "checking..."
+            //     ще до того, як запит навіть пішов. _connChecked встановлюється
+            //     в RunConnectionCheckAsync.
+            // EN: Only refresh the connection-line text if a check has
+            //     already happened at least once — otherwise the very first
+            //     ApplyLocalization call (from the constructor) would
+            //     overwrite the just-set "checking..." text before the
+            //     request has even gone out. _connChecked is set in
+            //     RunConnectionCheckAsync.
+            if (_connChecked)
+            {
+                SetConnectionLine(TxtConnTelegram, "Telegram", _lastConnResult?.Telegram);
+                SetConnectionLine(TxtConnDiscord, "Discord", _lastConnResult?.Discord);
+            }
+
             ChkRawMode.Content = _loc.Get("send.raw.toggle");
             TxtRawModeHint.Text = _loc.Get("send.raw.hint");
             TxtRawTelegramLabel.Text = _loc.Get("send.raw.telegram_label");
@@ -181,6 +250,22 @@ namespace EMP.UAHelper.WPF
             TxtRawDiscordLabel.Text = _loc.Get("send.raw.discord_label");
             TxtRawDiscordHint.Text = _loc.Get("send.raw.discord_hint");
             TxtRawEmpty.Text = _loc.Get("send.raw.empty_platforms");
+
+            // UA: Підказки кнопок форматування — та сама пара ключів для
+            //     обох платформ (Telegram і Discord), бо суть позначки
+            //     однакова, лише синтаксис різний (уже видно з самого коду,
+            //     що вставляється)
+            // EN: Formatting button tooltips — the same pair of keys for
+            //     both platforms (Telegram and Discord), since the meaning of
+            //     each mark is identical, only the syntax differs (already
+            //     visible from the inserted code itself)
+            BtnFmtTgBold.ToolTip = BtnFmtDcBold.ToolTip = _loc.Get("send.raw.format.bold");
+            BtnFmtTgItalic.ToolTip = BtnFmtDcItalic.ToolTip = _loc.Get("send.raw.format.italic");
+            BtnFmtTgUnderline.ToolTip = BtnFmtDcUnderline.ToolTip = _loc.Get("send.raw.format.underline");
+            BtnFmtTgStrike.ToolTip = BtnFmtDcStrike.ToolTip = _loc.Get("send.raw.format.strike");
+            BtnFmtTgCode.ToolTip = BtnFmtDcCode.ToolTip = _loc.Get("send.raw.format.code");
+            BtnFmtTgSpoiler.ToolTip = BtnFmtDcSpoiler.ToolTip = _loc.Get("send.raw.format.spoiler");
+            BtnFmtTgLink.ToolTip = BtnFmtDcLink.ToolTip = _loc.Get("send.raw.format.link");
 
             TxtRawDateLabel.Text = _loc.Get("send.raw.scheduled.date_label");
             TxtRawTimeLabel.Text = string.Format(_loc.Get("send.raw.scheduled.time_label"), ZoneLabel());
@@ -204,12 +289,22 @@ namespace EMP.UAHelper.WPF
             TxtChannelHint.Text = _loc.Get("send.channel.hint");
 
             // UA: Список каналів перебудовується саме тут, а не в конструкторі:
-            //     підписи безіменних каналів локалізовані, тож при перемиканні
-            //     мови вони мають змінитись разом з рештою інтерфейсу
+            //     підписи безіменних каналів локалізовані, тож коли мова
+            //     перемикається, вони мають змінитись разом з рештою інтерфейсу
             // EN: The channel list is rebuilt here rather than in the
             //     constructor: labels for unnamed channels are localized, so
             //     they must change along with the rest of the UI on switch
             BuildChannelList();
+
+            // UA: Та сама причина, що й у BuildChannelList() вище — підпис
+            //     "ввести вручну" локалізований, тож список ролей теж
+            //     перебудовується тут, а не лише в конструкторі
+            // EN: Same reason as BuildChannelList() above — the "enter
+            //     manually" label is localized, so the role list is also
+            //     rebuilt here, not just in the constructor
+            TxtRolePickerLabel.Text = _loc.Get("send.raw.role_picker.label");
+            BuildRoleList();
+            UpdateRolePickerVisibility();
 
             ItemLive.Content = _loc.Get("type.live");
             ItemUpcoming.Content = _loc.Get("type.upcoming");
@@ -313,7 +408,10 @@ namespace EMP.UAHelper.WPF
         //     subscription in .g.cs code, and relying on a subtlety of method
         //     group conversion rules to save three lines is a bad trade.
         private void MentionType_SelectionChanged(object sender, SelectionChangedEventArgs e)
-            => UpdateMentionSnippet();
+        {
+            UpdateMentionSnippet();
+            UpdateRolePickerVisibility();
+        }
 
         private void MentionId_TextChanged(object sender, TextChangedEventArgs e)
             => UpdateMentionSnippet();
@@ -328,7 +426,7 @@ namespace EMP.UAHelper.WPF
 
             // UA: Дужки навколо "as string" не обов'язкові за правилами
             //     пріоритету, але без них рядок читається як "as (string switch
-            //     ...)", що збиває з пантелику при читанні
+            //     ...)", що збиває з пантелику під час читання
             // EN: The parentheses around "as string" aren't required by
             //     precedence rules, but without them the line reads as
             //     "as (string switch ...)", which is confusing to read
@@ -359,6 +457,89 @@ namespace EMP.UAHelper.WPF
         {
             if (!string.IsNullOrEmpty(RawMentionSnippetBox.Text))
                 System.Windows.Clipboard.SetText(RawMentionSnippetBox.Text);
+        }
+
+        // =====================================================================
+        // UA: Пікер збереженої ролі — альтернатива ручному введенню ID у
+        //     RawMentionIdInput. Пункт 0 завжди "ввести вручну" (нічого не
+        //     підставляє, не чіпає поточне значення поля ID) — так початковий
+        //     стан (без жодної ролі ще не обраної) не виглядає так, ніби вже
+        //     щось вибрано.
+        // EN: Saved-role picker — an alternative to typing the ID by hand
+        //     into RawMentionIdInput. Item 0 is always "enter manually"
+        //     (inserts nothing, leaves the ID field's current value alone) —
+        //     so the initial state (no role picked yet) doesn't look like
+        //     something was already selected.
+        // =====================================================================
+        private void BuildRoleList()
+        {
+            // UA: Список будується не лише зі "Збережених ролей Discord", а й
+            //     включає основну роль сповіщень (DiscordRoleId з "⚙️
+            //     Налаштування" → Discord) — її не треба дублювати в окремий
+            //     список, щоб вона з'явилась тут. Без цього кроку людина, що
+            //     задала роль лише для автоматичних сповіщень, взагалі не
+            //     бачила жодного вибору в цьому пікері — саме так і сталось.
+            //     HashSet дедуплікує за ID, щоб та сама роль не з'явилась
+            //     двічі, якщо її випадково завели в обох місцях.
+            // EN: The list isn't built only from "Saved Discord roles" — it
+            //     also includes the primary notification role (DiscordRoleId
+            //     from "⚙️ Settings" → Discord) — it doesn't need to be
+            //     duplicated into the separate list to show up here. Without
+            //     this, someone who only ever set a role for automatic
+            //     notifications saw no choice at all in this picker — which
+            //     is exactly what happened.
+            //     The HashSet deduplicates by ID, so the same role doesn't
+            //     appear twice if it was accidentally entered in both places.
+            var seenIds = new HashSet<string>();
+            var roles = new List<DiscordRoleTarget>();
+
+            if (!string.IsNullOrWhiteSpace(_settings.DiscordRoleId) && seenIds.Add(_settings.DiscordRoleId))
+            {
+                roles.Add(new DiscordRoleTarget
+                {
+                    Name = _loc.Get("send.raw.role_picker.default_role"),
+                    Id = _settings.DiscordRoleId
+                });
+            }
+
+            foreach (var role in _settings.DiscordRoles)
+            {
+                if (string.IsNullOrWhiteSpace(role.Id)) continue;
+                if (!seenIds.Add(role.Id)) continue;
+                roles.Add(role);
+            }
+
+            _roles = roles;
+
+            var items = new List<string> { _loc.Get("send.raw.role_picker.manual") };
+            items.AddRange(_roles.Select(r => string.IsNullOrWhiteSpace(r.Name) ? r.Id : r.Name));
+
+            RawRoleCombo.ItemsSource = items;
+            RawRoleCombo.SelectedIndex = 0;
+        }
+
+        // UA: Пікер показується лише для типу "Роль" і лише якщо є з чого
+        //     обирати — для User/Channel чи порожнього списку ролей він
+        //     просто не займає місця на екрані
+        // EN: Only show the picker for the "Role" type, and only if there's
+        //     something to pick — for User/Channel or an empty role list it
+        //     simply takes up no screen space
+        private void UpdateRolePickerVisibility()
+        {
+            if (PanelRoleQuickPick == null) return;
+
+            var tag = (MentionTypeCombo.SelectedItem as ComboBoxItem)?.Tag as string;
+            PanelRoleQuickPick.Visibility = (tag == "role" && _roles.Count > 0)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void RawRoleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var i = RawRoleCombo.SelectedIndex;
+            if (i <= 0 || i - 1 >= _roles.Count) return;
+
+            RawMentionIdInput.Text = _roles[i - 1].Id;
         }
 
         // =====================================================================
@@ -401,9 +582,9 @@ namespace EMP.UAHelper.WPF
                 }));
 
             // UA: Перебудова не має скидати вже зроблений вибір (метод
-            //     викликається й при перемиканні мови) — тому запам'ятовуємо
-            //     URL (за старим _channels/SelectedIndex) і повертаємось на
-            //     нього, якщо такий канал ще існує
+            //     викликається й під час перемикання мови) — тому URL (за
+            //     старим _channels/SelectedIndex) запам'ятовується, і вибір
+            //     повертається на нього, якщо такий канал ще існує
             // EN: Rebuilding must not reset an existing choice (the method also
             //     runs on language switch) — so remember the URL (via the old
             //     _channels/SelectedIndex) and return to it if that channel
@@ -506,13 +687,13 @@ namespace EMP.UAHelper.WPF
 
         // =====================================================================
         // UA: Прикріплення зображень у ручному режимі — спільна галерея для
-        //     Telegram і Discord. Ліміт кількості (10) не наш вибір, а жорстка
-        //     межа Telegram-медіагрупи (TelegramService.MaxAttachmentsPerMessage);
+        //     Telegram і Discord. Ліміт кількості (10) — не довільне рішення,
+        //     а жорстка межа Telegram-медіагрупи (TelegramService.MaxAttachmentsPerMessage);
         //     Discord дозволяє більше, але єдина межа для обох платформ
         //     зрозуміліша, ніж дві різні.
         // EN: Image attachments in manual mode — one shared gallery for
-        //     Telegram and Discord. The count limit (10) isn't our choice —
-        //     it's Telegram's hard media-group limit
+        //     Telegram and Discord. The count limit (10) isn't an arbitrary
+        //     choice — it's Telegram's hard media-group limit
         //     (TelegramService.MaxAttachmentsPerMessage); Discord allows more,
         //     but one shared limit for both platforms is clearer than two
         //     different ones.
@@ -553,8 +734,18 @@ namespace EMP.UAHelper.WPF
             PanelAttachGallery.Children.Clear();
             var oversized = false;
 
-            foreach (var path in _attachedImagePaths)
+            // UA: for з індексом, а не foreach — потрібен для стрілок
+            //     порядку (яка з них активна залежить від позиції) і для
+            //     drag-and-drop (куди саме "впало" перетягнуте зображення)
+            // EN: for with an index, not foreach — needed for the order
+            //     arrows (which one is enabled depends on position) and for
+            //     drag-and-drop (exactly where a dragged image was "dropped")
+            for (var index = 0; index < _attachedImagePaths.Count; index++)
             {
+                var path = _attachedImagePaths[index];
+                var capturedIndex = index;
+                var capturedPath = path;
+
                 var item = new StackPanel { Width = 76, Margin = new Thickness(0, 0, 8, 8) };
 
                 var border = new Border
@@ -563,7 +754,9 @@ namespace EMP.UAHelper.WPF
                     Height = 72,
                     BorderBrush = Brush("#3D2B5E"),
                     BorderThickness = new Thickness(1),
-                    ClipToBounds = true
+                    ClipToBounds = true,
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    AllowDrop = true
                 };
 
                 try
@@ -610,6 +803,106 @@ namespace EMP.UAHelper.WPF
                 if (TryGetFileSize(path) is long size && size > WarnFileSizeBytes)
                     oversized = true;
 
+                // UA: Клік vs перетягування на одній і тій самій мініатюрі —
+                //     відстежуються точка натискання й поріг зсуву миші
+                //     (SystemParameters.MinimumXxxDragDistance, системне
+                //     значення, а не довільне число). Якщо зсув перевищує
+                //     поріг — це перетягування (DragDrop.DoDragDrop, курсор
+                //     "відпускається" лише над іншою мініатюрою). Якщо ні —
+                //     це звичайний клік, що відкриває перегляд повного розміру.
+                // EN: Click vs drag on the same thumbnail — track the press
+                //     point and the mouse-move threshold
+                //     (SystemParameters.MinimumXxxDragDistance, a system
+                //     value, not an arbitrary number). If the movement
+                //     exceeds the threshold, it's a drag (DragDrop.DoDragDrop,
+                //     "dropped" only over another thumbnail). Otherwise it's
+                //     a plain click that opens the full-size preview.
+                System.Windows.Point? dragStart = null;
+
+                border.PreviewMouseLeftButtonDown += (_, args) =>
+                    dragStart = args.GetPosition(null);
+
+                border.PreviewMouseMove += (_, args) =>
+                {
+                    if (dragStart is not { } start) return;
+                    if (args.LeftButton != System.Windows.Input.MouseButtonState.Pressed) return;
+
+                    var current = args.GetPosition(null);
+                    if (Math.Abs(current.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                        Math.Abs(current.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
+                        return;
+
+                    // UA: Поріг перевищено — це перетягування, а не клік;
+                    //     dragStart скидається, щоб наступний MouseLeftButtonUp
+                    //     не відкрив прев'ю замість завершення drag'у
+                    // EN: Threshold exceeded — this is a drag, not a click;
+                    //     reset dragStart so the following
+                    //     MouseLeftButtonUp doesn't open the preview instead
+                    //     of finishing the drag
+                    dragStart = null;
+                    // UA: System.Windows.DragDropEffects вказано явно — у
+                    //     проєкті підключено й System.Windows.Forms (через
+                    //     OpenFileDialog), де є однойменний тип, тож без
+                    //     повного шляху компілятор не може визначити, який
+                    //     саме DragDropEffects мається на увазі (CS0104)
+                    // EN: Explicitly qualify System.Windows.DragDropEffects —
+                    //     the project also references System.Windows.Forms
+                    //     (for OpenFileDialog), which has a type of the same
+                    //     name, so without the full path the compiler can't
+                    //     tell which DragDropEffects is meant (CS0104)
+                    DragDrop.DoDragDrop(border, capturedIndex, System.Windows.DragDropEffects.Move);
+                };
+
+                border.PreviewMouseLeftButtonUp += (_, _) =>
+                {
+                    // UA: dragStart все ще заданий — отже, перетягування не
+                    //     відбулось, і це був звичайний клік
+                    // EN: dragStart is still set — so no drag happened, and
+                    //     this was a plain click
+                    if (dragStart != null)
+                        ShowImagePreview(capturedPath);
+                    dragStart = null;
+                };
+
+                border.Drop += (_, args) =>
+                {
+                    if (!args.Data.GetDataPresent(typeof(int))) return;
+                    var sourceIndex = (int)args.Data.GetData(typeof(int));
+                    MoveAttachment(sourceIndex, capturedIndex);
+                };
+
+                var moveLeftButton = new Button
+                {
+                    Content = "◀",
+                    Style = (Style)FindResource("FormatToolButton"),
+                    Margin = new Thickness(0, 4, 0, 0),
+                    IsEnabled = index > 0,
+                    ToolTip = _loc.Get("send.raw.attach.move_left")
+                };
+                moveLeftButton.Click += (_, _) => MoveAttachment(capturedIndex, capturedIndex - 1);
+
+                var moveRightButton = new Button
+                {
+                    Content = "▶",
+                    Style = (Style)FindResource("FormatToolButton"),
+                    Margin = new Thickness(4, 4, 0, 0),
+                    IsEnabled = index < _attachedImagePaths.Count - 1,
+                    ToolTip = _loc.Get("send.raw.attach.move_right")
+                };
+                moveRightButton.Click += (_, _) => MoveAttachment(capturedIndex, capturedIndex + 1);
+
+                var moveRow = new StackPanel
+                {
+                    // UA: Те саме, що й з DragDropEffects вище — System.Windows.Forms
+                    //     теж має свій Orientation, тож тут потрібен повний шлях
+                    // EN: Same issue as DragDropEffects above — System.Windows.Forms
+                    //     also has its own Orientation, so the full path is needed here
+                    Orientation = System.Windows.Controls.Orientation.Horizontal,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                };
+                moveRow.Children.Add(moveLeftButton);
+                moveRow.Children.Add(moveRightButton);
+
                 var removeButton = new Button
                 {
                     Content = "✕",
@@ -618,7 +911,6 @@ namespace EMP.UAHelper.WPF
                     HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
                     ToolTip = _loc.Get("send.raw.attach.remove")
                 };
-                var capturedPath = path;
                 removeButton.Click += (_, _) =>
                 {
                     _attachedImagePaths.Remove(capturedPath);
@@ -626,12 +918,405 @@ namespace EMP.UAHelper.WPF
                 };
 
                 item.Children.Add(border);
+                item.Children.Add(moveRow);
                 item.Children.Add(removeButton);
                 PanelAttachGallery.Children.Add(item);
             }
 
             BtnAttachImages.IsEnabled = _attachedImagePaths.Count < TelegramService.MaxAttachmentsPerMessage;
             TxtAttachSizeWarning.Visibility = oversized ? Visibility.Visible : Visibility.Collapsed;
+
+            // UA: Вкладення впливають на ліміт Telegram (підпис коротший за
+            //     звичайний текст) — тож лічильник треба оновити і тут, а не
+            //     лише коли змінюється сам текст
+            // EN: Attachments affect Telegram's limit (a caption is shorter
+            //     than plain text) — so the counter must be refreshed here
+            //     too, not only when the text itself changes
+            UpdateCharCounters();
+        }
+
+        // UA: Переставляє вкладення в списку й перебудовує галерею. Єдина
+        //     точка зміни порядку — використовується і стрілками ◀▶, і
+        //     drag-and-drop, тож обидва способи гарантовано поводяться
+        //     однаково
+        // EN: Moves an attachment within the list and rebuilds the gallery.
+        //     The single point where order changes — used by both the ◀▶
+        //     arrows and drag-and-drop, so the two input methods are
+        //     guaranteed to behave identically
+        private void MoveAttachment(int fromIndex, int toIndex)
+        {
+            if (fromIndex == toIndex) return;
+            if (fromIndex < 0 || fromIndex >= _attachedImagePaths.Count) return;
+            if (toIndex < 0 || toIndex >= _attachedImagePaths.Count) return;
+
+            var path = _attachedImagePaths[fromIndex];
+            _attachedImagePaths.RemoveAt(fromIndex);
+            _attachedImagePaths.Insert(toIndex, path);
+
+            RebuildAttachmentGallery();
+        }
+
+        // UA: Перегляд зображення в повному розмірі — окреме модальне вікно
+        //     поверх цього, без власного XAML-файлу (повністю з коду, як і
+        //     решта елементів галереї). Esc або клік за межами закриває.
+        //     Якщо файл зник з диска між вибором і кліком — жодної дії,
+        //     мініатюра вже й так показує позначку ⚠ для цього випадку
+        // EN: Full-size image preview — a separate modal window on top of
+        //     this one, with no XAML file of its own (built entirely from
+        //     code, like the rest of the gallery). Esc or clicking outside
+        //     closes it. If the file vanished from disk between selection
+        //     and the click — silently do nothing, the thumbnail already
+        //     shows a ⚠ marker for that case
+        //
+        //     UA: Раніше зображення примусово стискалось до MaxWidth=900/
+        //     MaxHeight=700 — на моніторах з меншою роздільною здатністю, ніж
+        //     оригінал (напр. 1080p), це давало помітно зменшену картинку з
+        //     рамками по боках і без жодного способу роздивитись деталі.
+        //     Тепер зображення показується в оригінальному розмірі (Stretch
+        //     .None) всередині ScrollViewer, вікно підлаштовується під розмір
+        //     картинки, але не більше ~92% робочої area екрана. Масштаб
+        //     керується Ctrl+колесо миші (як у браузерах) або кнопками
+        //     ➖ / 100% / ➕ зверху — для зображень, більших за екран, чи
+        //     навпаки, щоб роздивитись дрібні деталі ближче.
+        //     EN: Previously the image was forced down to MaxWidth=900/
+        //     MaxHeight=700 — on monitors with a lower resolution than the
+        //     original (e.g. 1080p), this produced a visibly shrunk image
+        //     with side bars and no way to inspect detail. The image is now
+        //     shown at its native size (Stretch.None) inside a ScrollViewer;
+        //     the window sizes itself to the image but caps at ~92% of the
+        //     screen's work area. Zoom is controlled via Ctrl+mouse wheel
+        //     (the same gesture browsers use) or the ➖ / 100% / ➕ buttons
+        //     above the image — for images bigger than the screen, or to
+        //     zoom in on fine detail.
+        private void ShowImagePreview(string path)
+        {
+            try
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(path, UriKind.Absolute);
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+
+                var scaleTransform = new ScaleTransform(1.0, 1.0);
+
+                var image = new System.Windows.Controls.Image
+                {
+                    Source = bitmap,
+                    Stretch = Stretch.None,
+                    LayoutTransform = scaleTransform
+                };
+
+                var scrollViewer = new ScrollViewer
+                {
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Content = image
+                };
+
+                // UA: Ctrl+колесо миші змінює масштаб; без Ctrl колесо й далі
+                //     прокручує вміст як завжди (стандартна поведінка
+                //     ScrollViewer не чіпається)
+                // EN: Ctrl+wheel changes the zoom; without Ctrl the wheel
+                //     keeps scrolling the content as usual (the default
+                //     ScrollViewer behavior is left untouched)
+                scrollViewer.PreviewMouseWheel += (_, args) =>
+                {
+                    if (System.Windows.Input.Keyboard.Modifiers != System.Windows.Input.ModifierKeys.Control) return;
+                    args.Handled = true;
+                    var factor = args.Delta > 0 ? 1.15 : 1 / 1.15;
+                    var newScale = Math.Clamp(scaleTransform.ScaleX * factor, 0.1, 6.0);
+                    scaleTransform.ScaleX = scaleTransform.ScaleY = newScale;
+                };
+
+                var zoomLabel = new TextBlock
+                {
+                    Text = "100%", Foreground = Brush("#E5DFF0"),
+                    VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                    Width = 44, TextAlignment = System.Windows.TextAlignment.Center
+                };
+
+                void ApplyZoom(double scale)
+                {
+                    scaleTransform.ScaleX = scaleTransform.ScaleY = scale;
+                    zoomLabel.Text = $"{scale * 100:0}%";
+                }
+
+                var btnZoomOut = new Button
+                {
+                    Content = "➖", Style = (Style)FindResource("FormatToolButton"),
+                    ToolTip = _loc.Get("send.preview.zoom_out")
+                };
+                btnZoomOut.Click += (_, _) => ApplyZoom(Math.Max(scaleTransform.ScaleX / 1.25, 0.1));
+
+                var btnZoomReset = new Button
+                {
+                    Content = "⟲", Style = (Style)FindResource("FormatToolButton"),
+                    ToolTip = _loc.Get("send.preview.zoom_reset")
+                };
+                btnZoomReset.Click += (_, _) => ApplyZoom(1.0);
+
+                var btnZoomIn = new Button
+                {
+                    Content = "➕", Style = (Style)FindResource("FormatToolButton"),
+                    ToolTip = _loc.Get("send.preview.zoom_in")
+                };
+                btnZoomIn.Click += (_, _) => ApplyZoom(Math.Min(scaleTransform.ScaleX * 1.25, 6.0));
+
+                var toolbar = new StackPanel
+                {
+                    Orientation = System.Windows.Controls.Orientation.Horizontal,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 8)
+                };
+                toolbar.Children.Add(btnZoomOut);
+                toolbar.Children.Add(zoomLabel);
+                toolbar.Children.Add(btnZoomIn);
+                toolbar.Children.Add(btnZoomReset);
+
+                var root = new DockPanel();
+                DockPanel.SetDock(toolbar, Dock.Top);
+                root.Children.Add(toolbar);
+                root.Children.Add(scrollViewer);
+
+                // UA: Вікно підлаштовується під реальний розмір картинки
+                //     (+невеликий запас на панель інструментів і можливі
+                //     смуги прокрутки), але не більше ~92% робочої area
+                //     екрана — щоб вікно саме не вилізло за межі монітора
+                //     на 4K/8K зображеннях
+                // EN: The window sizes itself to the image's real dimensions
+                //     (plus a small allowance for the toolbar and potential
+                //     scrollbars), capped at ~92% of the screen's work area —
+                //     so the window itself doesn't overflow the monitor on
+                //     4K/8K images
+                var workArea = SystemParameters.WorkArea;
+                var preview = new Window
+                {
+                    Title = $"{Path.GetFileName(path)} ({bitmap.PixelWidth}×{bitmap.PixelHeight})",
+                    Content = root,
+                    Width = Math.Min(bitmap.PixelWidth + 40, workArea.Width * 0.92),
+                    Height = Math.Min(bitmap.PixelHeight + 90, workArea.Height * 0.92),
+                    ResizeMode = ResizeMode.CanResize,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = this,
+                    Background = Brush("#0D0A14")
+                };
+
+                preview.PreviewKeyDown += (_, args) =>
+                {
+                    if (args.Key == System.Windows.Input.Key.Escape) preview.Close();
+                };
+
+                preview.ShowDialog();
+            }
+            catch
+            {
+                // UA: Файл зник/пошкоджений — нічого не показується, це не
+                //     критична дія
+                // EN: The file vanished/is corrupted — show nothing, this
+                //     isn't a critical action
+            }
+        }
+
+        // =====================================================================
+        // UA: Реальні ліміти символів для ручного режиму.
+        //     Telegram: 4096 символів для звичайного тексту (sendMessage),
+        //     але лише 1024 для підпису (sendPhoto/sendMediaGroup) — тому межа
+        //     залежить від того, чи є вкладення.
+        //     Discord: content завжди обмежений 2000 символами, незалежно від
+        //     вкладень.
+        //     Лічильник під полем показує ці цифри в реальному часі; окремо
+        //     від нього CheckCharLimits нижче блокує фактичну відправку на
+        //     платформу, текст для якої перевищує її ліміт.
+        // EN: Real character limits for manual mode.
+        //     Telegram: 4096 characters for plain text (sendMessage), but
+        //     only 1024 for a caption (sendPhoto/sendMediaGroup) — so the
+        //     limit depends on whether there's an attachment.
+        //     Discord: content is always capped at 2000 characters,
+        //     regardless of attachments.
+        //     The counter under each field shows these numbers live;
+        //     separately, CheckCharLimits below blocks the actual send to
+        //     any platform whose text exceeds its limit.
+        // =====================================================================
+        private const int TelegramTextLimit = 4096;
+        private const int TelegramCaptionLimit = 1024;
+        private const int DiscordContentLimit = 2000;
+
+        // UA: Перевірка лімітів ПЕРЕД відправкою — на відміну від лічильника
+        //     (який лише показує числа), перевищення тут знімає платформу зі
+        //     списку адресатів. Якщо лишається хоча б одна платформа без
+        //     перевищення, користувач явно підтверджує часткову відправку
+        //     лише туди; якщо валідної платформи не лишається — відправка
+        //     скасовується повністю, без варіанту "відправити частково".
+        // EN: A limit check BEFORE sending — unlike the counter (which only
+        //     displays numbers), exceeding the limit here removes that
+        //     platform from the recipient list. If at least one platform
+        //     without an overage remains, the user explicitly confirms a
+        //     partial send to just that platform; if no valid platform
+        //     remains, the send is cancelled entirely, with no "send
+        //     partially" option.
+        private (bool SendTelegram, bool SendDiscord) CheckCharLimits(
+            string telegramText, string discordText, bool hasImages, bool wantTelegram, bool wantDiscord)
+        {
+            var telegramLimit = hasImages ? TelegramCaptionLimit : TelegramTextLimit;
+            var telegramOver = wantTelegram && telegramText.Length > telegramLimit;
+            var discordOver = wantDiscord && discordText.Length > DiscordContentLimit;
+
+            if (!telegramOver && !discordOver)
+                return (wantTelegram, wantDiscord);
+
+            var lines = new List<string>();
+            if (telegramOver)
+                lines.Add(string.Format(_loc.Get("send.raw.limit.line"), "Telegram", telegramText.Length, telegramLimit));
+            if (discordOver)
+                lines.Add(string.Format(_loc.Get("send.raw.limit.line"), "Discord", discordText.Length, DiscordContentLimit));
+            var body = string.Join("\n", lines);
+
+            var telegramViable = wantTelegram && !telegramOver;
+            var discordViable = wantDiscord && !discordOver;
+
+            if (!telegramViable && !discordViable)
+            {
+                System.Windows.MessageBox.Show(
+                    body + "\n\n" + _loc.Get("send.raw.limit.blocked_suffix"),
+                    _loc.Get("app.name"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return (false, false);
+            }
+
+            var viableName = telegramViable ? "Telegram" : "Discord";
+            var exceededName = telegramOver ? "Telegram" : "Discord";
+            var confirmed = System.Windows.MessageBox.Show(
+                body + "\n\n" + string.Format(_loc.Get("send.raw.limit.confirm_partial"), viableName, exceededName),
+                _loc.Get("app.name"), MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+
+            return confirmed ? (telegramViable, discordViable) : (false, false);
+        }
+
+        private void RawTelegramInput_TextChanged(object sender, TextChangedEventArgs e)
+            => UpdateCharCounters();
+
+        private void RawDiscordInput_TextChanged(object sender, TextChangedEventArgs e)
+            => UpdateCharCounters();
+
+        // =====================================================================
+        // UA: Панель форматування — кнопка застосовує код до ВИДІЛЕНОГО
+        //     тексту, або, якщо нічого не виділено, вставляє пару
+        //     тегів/символів на місці курсора й ставить курсор МІЖ ними, щоб
+        //     одразу можна було друкувати. Жодної магії з парсингом —
+        //     користувач і далі бачить і редагує сирий текст з тегами, так
+        //     само, як і раніше під час ручного набору.
+        // EN: A formatting toolbar — a button applies the markup to the
+        //     SELECTED text, or, if nothing is selected, inserts the pair
+        //     of tags/symbols at the caret and places the caret BETWEEN
+        //     them so typing can continue right away. No parsing magic —
+        //     the user still sees and edits the raw
+        //     tagged text, exactly as when typing it by hand before.
+        // =====================================================================
+        private void FormatTelegram_Click(object sender, RoutedEventArgs e)
+        {
+            var (prefix, suffix) = TelegramFormatFor((sender as Button)?.Tag as string);
+            if (prefix.Length > 0) ApplyFormatting(RawTelegramInput, prefix, suffix);
+        }
+
+        private void FormatDiscord_Click(object sender, RoutedEventArgs e)
+        {
+            var (prefix, suffix) = DiscordFormatFor((sender as Button)?.Tag as string);
+            if (prefix.Length > 0) ApplyFormatting(RawDiscordInput, prefix, suffix);
+        }
+
+        private static (string Prefix, string Suffix) TelegramFormatFor(string? tag) => tag switch
+        {
+            "b" => ("<b>", "</b>"),
+            "i" => ("<i>", "</i>"),
+            "u" => ("<u>", "</u>"),
+            "s" => ("<s>", "</s>"),
+            "code" => ("<code>", "</code>"),
+            "spoiler" => ("<tg-spoiler>", "</tg-spoiler>"),
+            // UA: URL — заготовка для ручного редагування, як і решта кнопок:
+            //     жодного діалогу вводу, користувач сам дописує адресу замість
+            //     буквального "URL" у вставленому тексті
+            // EN: URL — a placeholder for manual editing, same as the other
+            //     buttons: no input dialog, the user replaces the literal
+            //     "URL" in the inserted text with the real address
+            "link" => ("<a href=\"URL\">", "</a>"),
+            _ => (string.Empty, string.Empty)
+        };
+
+        private static (string Prefix, string Suffix) DiscordFormatFor(string? tag) => tag switch
+        {
+            "b" => ("**", "**"),
+            "i" => ("*", "*"),
+            "u" => ("__", "__"),
+            "s" => ("~~", "~~"),
+            "code" => ("`", "`"),
+            "spoiler" => ("||", "||"),
+            "link" => ("[", "](URL)"),
+            _ => (string.Empty, string.Empty)
+        };
+
+        // UA: Текст змінюється напряму (а не через SelectedText), щоб точно
+        //     контролювати, де опиниться курсор після зміни — WPF не
+        //     гарантує зручну позицію курсора після запису в SelectedText
+        // EN: The text is changed directly (not via SelectedText) to fully
+        //     control where the caret ends up afterward — WPF doesn't
+        //     guarantee a convenient caret position after writing to
+        //     SelectedText
+        private static void ApplyFormatting(TextBox target, string prefix, string suffix)
+        {
+            var start = target.SelectionStart;
+            var length = target.SelectionLength;
+            var text = target.Text;
+            var selected = text.Substring(start, length);
+
+            target.Text = text[..start] + prefix + selected + suffix + text[(start + length)..];
+
+            if (length == 0)
+            {
+                // UA: Нічого не виділено — курсор стає рівно між тегами
+                // EN: Nothing selected — the caret lands exactly between the tags
+                target.SelectionStart = start + prefix.Length;
+                target.SelectionLength = 0;
+            }
+            else
+            {
+                // UA: Було виділено текст — виділення лишається (тепер
+                //     разом з тегами видно весь результат одразу)
+                // EN: Text was selected — keep it selected (the whole result,
+                //     tags included, is now visible at once)
+                target.SelectionStart = start + prefix.Length;
+                target.SelectionLength = length;
+            }
+
+            target.Focus();
+        }
+
+        private void UpdateCharCounters()
+        {
+            // UA: Обробники підписуються ще під час InitializeComponent, коли
+            //     ці елементи ще не створені
+            // EN: Handlers get wired up during InitializeComponent, while
+            //     these elements don't exist yet
+            if (TxtTelegramCharCount == null || TxtDiscordCharCount == null) return;
+
+            var hasImages = _attachedImagePaths.Count > 0;
+            var telegramLimit = hasImages ? TelegramCaptionLimit : TelegramTextLimit;
+
+            SetCharCount(TxtTelegramCharCount, RawTelegramInput.Text.Length, telegramLimit);
+            SetCharCount(TxtDiscordCharCount, RawDiscordInput.Text.Length, DiscordContentLimit);
+        }
+
+        // UA: Червоний (не жовтий) навмисно — перевищення тут більше не
+        //     просто попередження, а реальна причина, через яку CheckCharLimits
+        //     заблокує відправку на цю платформу
+        // EN: Red (not yellow) on purpose — exceeding the limit here is no
+        //     longer just a warning, it's the real reason CheckCharLimits
+        //     will block sending to this platform
+        private static void SetCharCount(TextBlock target, int length, int limit)
+        {
+            target.Text = $"{length} / {limit}";
+            target.Foreground = length > limit
+                ? Brush("#E0605A")
+                : Brush("#B8A8D0");
         }
 
         // UA: Розмір файлу для м'якого попередження — файл міг зникнути з
@@ -692,7 +1377,7 @@ namespace EMP.UAHelper.WPF
         // UA: Повідомлення про проблеми із завантаженням списку.
         //     Гібридна стратегія свідомо: модальне вікно з'являється ЛИШЕ коли
         //     працювати справді нічим (ані свіжих даних, ані кешу) — інакше
-        //     людина отримувала б модалку при кожному відкритті вікна без
+        //     людина отримувала б модалку щоразу під час відкриття вікна без
         //     інтернету, навіть коли список нормально показано з кешу. У
         //     "м'якому" випадку достатньо помітного банера в самому вікні.
         //     У будь-якому разі повний стектрейс іде в logs/ — рядок в UI
@@ -782,8 +1467,40 @@ namespace EMP.UAHelper.WPF
         private static SolidColorBrush Brush(string hex) =>
             new((Color)(ColorConverter.ConvertFromString(hex) ?? Colors.Transparent));
 
+        // UA: Нормалізація тексту для полів, що йдуть у фактичне повідомлення
+        // EN: Text normalization for fields that become the actual message
+        private static readonly char[] FilteredChars = { 'ы', 'Ы', 'ъ', 'Ъ', 'э', 'Э', 'ё', 'Ё' };
+
+        private static string FilterText(string? text) =>
+            string.IsNullOrEmpty(text)
+                ? string.Empty
+                : new string(text.Where(c => Array.IndexOf(FilteredChars, c) < 0).ToArray());
+
+        private static void FilterTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+        {
+            if (e.Text.IndexOfAny(FilteredChars) >= 0)
+                e.Handled = true;
+        }
+
+        // UA: System.Windows.* кваліфіковано явно — той самий конфлікт
+        //     WPF/WinForms, що й з DragDropEffects/Orientation вище (CS0104)
+        // EN: System.Windows.* qualified explicitly — the same WPF/WinForms
+        //     conflict as DragDropEffects/Orientation above (CS0104)
+        private static void FilterPastedText(object sender, System.Windows.DataObjectPastingEventArgs e)
+        {
+            if (!e.DataObject.GetDataPresent(typeof(string))) return;
+            var pasted = (string)e.DataObject.GetData(typeof(string));
+            e.DataObject = new System.Windows.DataObject(FilterText(pasted));
+        }
+
+        private static void ApplyTextFilter(TextBox box)
+        {
+            box.PreviewTextInput += FilterTextInput;
+            System.Windows.DataObject.AddPastingHandler(box, FilterPastedText);
+        }
+
         // UA: Повторна спроба без перезапуску програми — той самий шлях, що й
-        //     при відкритті вікна, тож окремої логіки не потрібно
+        //     під час відкриття вікна, тож окремої логіки не потрібно
         // EN: Retry without restarting the app — the same path as on window
         //     open, so no separate logic is needed
         private async void BtnRetryLoad_Click(object sender, RoutedEventArgs e)
@@ -992,7 +1709,7 @@ namespace EMP.UAHelper.WPF
         //     source), not via URL pattern matching
         private void FillForm(ContentCacheEntry entry)
         {
-            TitleInput.Text = entry.Title;
+            TitleInput.Text = FilterText(entry.Title);
 
             TypeCombo.SelectedItem = entry.Type switch
             {
@@ -1421,7 +2138,7 @@ namespace EMP.UAHelper.WPF
                 return;
             }
 
-            var title = TitleInput.Text.Trim();
+            var title = FilterText(TitleInput.Text.Trim());
             if (string.IsNullOrWhiteSpace(title))
             {
                 System.Windows.MessageBox.Show(
@@ -1466,20 +2183,39 @@ namespace EMP.UAHelper.WPF
                 UrlOverride = string.IsNullOrWhiteSpace(url) ? null : url
             };
 
+            var webhookUrl = SelectedWebhookUrl();
+            var signature = ComputeSignature("template", title, type, scheduled, url, webhookUrl);
+            var (sendTelegram, sendDiscord) = ResolveResendScope(
+                signature, _settings.UseTelegram, _settings.UseDiscord);
+
+            // UA: Користувач відмовився повторно надсилати туди, де вже й так
+            //     підтверджено успіх, і нічого іншого надсилати не було
+            //     заплановано — немає що робити
+            // EN: The person declined to resend where success was already
+            //     confirmed, and nothing else was scheduled to send — nothing
+            //     left to do
+            if (!sendTelegram && !sendDiscord) return;
+
+            PanelSendStatus.Visibility = Visibility.Collapsed;
             BtnSend.IsEnabled = false;
             try
             {
-                await _dispatcher.SendAsync(video, SelectedWebhookUrl());
-                System.Windows.MessageBox.Show(
-                    _loc.Get("send.sent"), _loc.Get("app.name"),
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                Close();
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show(
-                    ex.Message, _loc.Get("app.error"),
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                var result = await _dispatcher.SendAsync(video, webhookUrl, sendTelegram, sendDiscord);
+                result = MergeSkippedPlatforms(signature, result);
+                _lastSendResult = result;
+                _lastSendSignature = signature;
+                ShowSendResult(result);
+
+                // UA: Вікно закривається лише якщо дійсно все, що мало піти,
+                //     пішло — часткова невдача мусить лишатись на екрані,
+                //     щоб людина це побачила, а не дізналась про це вже з
+                //     Telegram/Discord
+                // EN: Only close the window if everything that was supposed
+                //     to go out actually went out — a partial failure must
+                //     stay on screen so the person sees it here, not find
+                //     out from Telegram/Discord afterward
+                if (result.AllAttemptsSucceeded)
+                    Close();
             }
             finally
             {
@@ -1495,8 +2231,8 @@ namespace EMP.UAHelper.WPF
         //     empty field for a platform means "don't send there"
         private async Task SendRawAsync()
         {
-            var telegramText = _settings.UseTelegram ? RawTelegramInput.Text.Trim() : string.Empty;
-            var discordText = _settings.UseDiscord ? RawDiscordInput.Text.Trim() : string.Empty;
+            var telegramText = _settings.UseTelegram ? FilterText(RawTelegramInput.Text.Trim()) : string.Empty;
+            var discordText = _settings.UseDiscord ? FilterText(RawDiscordInput.Text.Trim()) : string.Empty;
 
             if (string.IsNullOrWhiteSpace(telegramText) && string.IsNullOrWhiteSpace(discordText))
             {
@@ -1506,26 +2242,286 @@ namespace EMP.UAHelper.WPF
                 return;
             }
 
+            var wantTelegram = !string.IsNullOrWhiteSpace(telegramText);
+            var wantDiscord = !string.IsNullOrWhiteSpace(discordText);
+
+            (wantTelegram, wantDiscord) = CheckCharLimits(
+                telegramText, discordText, _attachedImagePaths.Count > 0, wantTelegram, wantDiscord);
+            if (!wantTelegram && !wantDiscord) return;
+
+            var webhookUrl = SelectedWebhookUrl();
+            var signature = ComputeSignature("raw", telegramText, discordText, webhookUrl, _attachedImagePaths);
+            var (sendTelegram, sendDiscord) = ResolveResendScope(signature, wantTelegram, wantDiscord);
+
+            if (!sendTelegram && !sendDiscord) return;
+
+            PanelSendStatus.Visibility = Visibility.Collapsed;
             BtnSend.IsEnabled = false;
             try
             {
-                await _dispatcher.SendRawAsync(telegramText, discordText, SelectedWebhookUrl(), _attachedImagePaths);
-                System.Windows.MessageBox.Show(
-                    _loc.Get("send.sent"), _loc.Get("app.name"),
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                Close();
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show(
-                    ex.Message, _loc.Get("app.error"),
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                var result = await _dispatcher.SendRawAsync(
+                    telegramText, discordText, webhookUrl, _attachedImagePaths, sendTelegram, sendDiscord);
+                result = MergeSkippedPlatforms(signature, result);
+                _lastSendResult = result;
+                _lastSendSignature = signature;
+                ShowSendResult(result);
+
+                if (result.AllAttemptsSucceeded)
+                    Close();
             }
             finally
             {
                 BtnSend.IsEnabled = true;
             }
         }
+
+        // =====================================================================
+        // UA: Захист від дублів + реальний статус відправки (замість одного
+        //     спільного MessageBox "Відправлено"/"Помилка", який ховав, що
+        //     саме сталось з КОЖНОЮ платформою окремо — без цього немає
+        //     способу дізнатись, чи варто натискати "Надіслати" ще раз).
+        // EN: Duplicate-send protection + a real send status (instead of one
+        //     shared "Sent"/"Error" MessageBox, which hid what actually
+        //     happened to EACH platform separately — without this there's
+        //     no way to tell whether pressing "Send" again is even needed).
+        // =====================================================================
+
+        // UA: "Відбиток" вмісту конкретної спроби відправки — не криптографічний
+        //     хеш, просто конкатенація значень через розділювач, що не
+        //     зустрічається в тексті (U+0001). Призначення єдине: порівняти
+        //     "це та сама спроба чи інша" між двома натисканнями "Надіслати" в
+        //     межах ОДНОГО відкритого вікна. IEnumerable<string> (шляхи
+        //     зображень) розгортається в рядок через кому, решта — звичайний
+        //     ToString().
+        // EN: A content "fingerprint" for one send attempt — not a
+        //     cryptographic hash, just values joined by a separator that
+        //     won't appear in real text (U+0001). Single purpose: tell
+        //     "the same attempt or a different one" apart between two
+        //     "Send" clicks within ONE open window. IEnumerable<string>
+        //     (image paths) is flattened to a comma-joined string, everything
+        //     else uses plain ToString().
+        private static string ComputeSignature(params object?[] parts) =>
+            string.Join("\u0001", parts.Select(FormatSignaturePart));
+
+        private static string FormatSignaturePart(object? part) => part switch
+        {
+            null => string.Empty,
+            IEnumerable<string> list => string.Join(",", list),
+            _ => part.ToString() ?? string.Empty
+        };
+
+        // UA: Вирішує, чи дійсно відправляти на кожну з платформ ПРИ ЦЬОМУ
+        //     натисканні "Надіслати".
+        //     - Якщо вміст змінився з минулого разу (інший "відбиток") —
+        //       надсилається все, що просить людина: це нова спроба,
+        //       жодних підстав щось пропускати.
+        //     - Якщо вміст той самий і ЖОДНА платформа ще не підтвердила
+        //       успіх — теж надсилається все: звичайний повтор після
+        //       невдачі чи першої спроби.
+        //     - Якщо вміст той самий і ХОЧ ОДНА платформа вже підтвердила
+        //       успіх — запитується окреме підтвердження (саме та вимога, яку
+        //       поставив користувач), перш ніж повторно надсилати туди.
+        //       Відмова просто пропускає ці платформи, лишаючи решту (ще не
+        //       відправлені чи ті, що впали минулого разу).
+        // EN: Decides whether to actually send to each platform on THIS
+        //     "Send" click.
+        //     - If the content changed since last time (a different
+        //       "fingerprint") — send to everything the person asked for:
+        //       this is a new attempt, no reason to skip anything.
+        //     - If the content is the same and NO platform has confirmed
+        //       success yet — also send to everything: a normal retry after
+        //       a failure or the first attempt.
+        //     - If the content is the same and AT LEAST ONE platform already
+        //       confirmed success — ask for a separate confirmation (exactly
+        //       the requirement the user set) before sending there again.
+        //       Declining simply skips those platforms, keeping the rest
+        //       (not yet sent, or failed last time).
+        private (bool SendTelegram, bool SendDiscord) ResolveResendScope(
+            string signature, bool wantTelegram, bool wantDiscord)
+        {
+            if (_lastSendResult == null || _lastSendSignature != signature)
+                return (wantTelegram, wantDiscord);
+
+            var alreadyOkTelegram = wantTelegram && _lastSendResult.Telegram.Succeeded;
+            var alreadyOkDiscord = wantDiscord && _lastSendResult.Discord.Succeeded;
+
+            if (!alreadyOkTelegram && !alreadyOkDiscord)
+                return (wantTelegram, wantDiscord);
+
+            var confirmedPlatforms = new List<string>();
+            if (alreadyOkTelegram) confirmedPlatforms.Add("Telegram");
+            if (alreadyOkDiscord) confirmedPlatforms.Add("Discord");
+
+            var resendAnyway = System.Windows.MessageBox.Show(
+                string.Format(_loc.Get("send.status.resend_confirm"), string.Join(", ", confirmedPlatforms)),
+                _loc.Get("app.name"),
+                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+
+            return resendAnyway
+                ? (wantTelegram, wantDiscord)
+                : (wantTelegram && !alreadyOkTelegram, wantDiscord && !alreadyOkDiscord);
+        }
+
+        // UA: Коли ResolveResendScope пропускає платформу (бо вона вже
+        //     підтвердила успіх і людина відмовилась дублювати), дispatcher
+        //     повертає для неї Attempted=false — адже на ЦЕЙ раз її справді
+        //     не викликали. Без цього кроку збереження "успіху" з минулого
+        //     разу загубилось би: _lastSendResult перезаписався б на
+        //     Attempted=false/Succeeded=false, і вже за ТРЕТЬОЇ спроби захист
+        //     від дублів вирішив би, що платформа ще нічого не отримувала, й
+        //     мовчки надіслав би туди вдруге без жодного питання. Тут
+        //     "довершальний" результат для пропущеної платформи береться з
+        //     попереднього збереженого стану (той самий відбиток вмісту),
+        //     а не з щойно отриманого.
+        // EN: When ResolveResendScope skips a platform (because it already
+        //     confirmed success and the person declined to duplicate), the
+        //     dispatcher returns Attempted=false for it — it genuinely wasn't
+        //     called this time. Without this step, last time's "success"
+        //     would be lost: _lastSendResult would get overwritten with
+        //     Attempted=false/Succeeded=false, and on a THIRD attempt the
+        //     duplicate-send guard would conclude the platform never received
+        //     anything yet and silently send there again with no question
+        //     asked. Here, the "carried-forward" result for a skipped
+        //     platform is taken from the previously stored state (same
+        //     content fingerprint), not from the result just received.
+        private SendResult MergeSkippedPlatforms(string signature, SendResult current)
+        {
+            if (_lastSendResult == null || _lastSendSignature != signature)
+                return current;
+
+            var telegram = (!current.Telegram.Attempted && _lastSendResult.Telegram.Succeeded)
+                ? _lastSendResult.Telegram
+                : current.Telegram;
+
+            var discord = (!current.Discord.Attempted && _lastSendResult.Discord.Succeeded)
+                ? _lastSendResult.Discord
+                : current.Discord;
+
+            return new SendResult { Telegram = telegram, Discord = discord };
+        }
+
+        // UA: Показує реальний результат по кожній платформі окремо. Рядок
+        //     для платформи, яку не увімкнено в налаштуваннях, просто
+        //     ховається — немає сенсу показувати "—" для того, чого й бути
+        //     не могло
+        // EN: Shows the real result for each platform separately. The line
+        //     for a platform that isn't enabled in settings is simply
+        //     hidden — no point showing "—" for something that couldn't
+        //     have happened anyway
+        private void ShowSendResult(SendResult result)
+        {
+            PanelSendStatus.Visibility = Visibility.Visible;
+
+            TxtSendStatusTelegram.Visibility = _settings.UseTelegram ? Visibility.Visible : Visibility.Collapsed;
+            TxtSendStatusDiscord.Visibility = _settings.UseDiscord ? Visibility.Visible : Visibility.Collapsed;
+
+            SetStatusLine(TxtSendStatusTelegram, "Telegram", result.Telegram);
+            SetStatusLine(TxtSendStatusDiscord, "Discord", result.Discord);
+        }
+
+        private void SetStatusLine(TextBlock target, string platformLabel, PlatformSendResult r)
+        {
+            if (!r.Attempted)
+            {
+                target.Text = $"{platformLabel}: {_loc.Get("send.status.skipped")}";
+                target.Foreground = Brush("#B8A8D0");
+                return;
+            }
+
+            if (r.Succeeded)
+            {
+                target.Text = $"{platformLabel}: {_loc.Get("send.status.ok")}";
+                target.Foreground = Brush("#55C57A");
+            }
+            else
+            {
+                target.Text = $"{platformLabel}: {_loc.Get("send.status.failed")} — {r.Error?.Message}";
+                target.Foreground = Brush("#E0605A");
+            }
+        }
+
+        // UA: Перевірка з'єднання з увімкненими платформами — ДО фактичної
+        //     відправки. Викликається і автоматично (з конструктора, при
+        //     відкритті вікна), і вручну (кнопка 🔄) — тому зроблена
+        //     ідемпотентною, без побічних ефектів поза цими двома рядками.
+        //     На відміну від SendAsync/RunAsync, тут НІЧОГО не пишеться в
+        //     logs/ — це лише діагностика досяжності платформи, а не спроба
+        //     відправки, і лог з написом "не вдалось відправити" був би тут
+        //     відвертою брехнею.
+        // EN: Checks connectivity with the enabled platforms — BEFORE an
+        //     actual send. Called both automatically (from the constructor,
+        //     on window open) and manually (the 🔄 button) — kept
+        //     idempotent, with no side effects beyond these two lines.
+        //     Unlike SendAsync/RunAsync, NOTHING is written to logs/ here —
+        //     this is only reachability diagnostics, not a send
+        //     attempt, and a log entry saying "send failed" would be an
+        //     outright lie here.
+        private async Task RunConnectionCheckAsync()
+        {
+            TxtConnTelegram.Visibility = _settings.UseTelegram ? Visibility.Visible : Visibility.Collapsed;
+            TxtConnDiscord.Visibility = _settings.UseDiscord ? Visibility.Visible : Visibility.Collapsed;
+
+            if (!_settings.UseTelegram && !_settings.UseDiscord)
+            {
+                PanelConnectionCheck.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            PanelConnectionCheck.Visibility = Visibility.Visible;
+
+            if (_settings.UseTelegram)
+            {
+                TxtConnTelegram.Text = $"Telegram: {_loc.Get("send.conn.checking")}";
+                TxtConnTelegram.Foreground = Brush("#B8A8D0");
+            }
+
+            if (_settings.UseDiscord)
+            {
+                TxtConnDiscord.Text = $"Discord: {_loc.Get("send.conn.checking")}";
+                TxtConnDiscord.Foreground = Brush("#B8A8D0");
+            }
+
+            BtnRecheckConnection.IsEnabled = false;
+            try
+            {
+                var result = await _dispatcher.CheckConnectionsAsync(SelectedWebhookUrl());
+                _lastConnResult = result;
+                _connChecked = true;
+
+                SetConnectionLine(TxtConnTelegram, "Telegram", result.Telegram);
+                SetConnectionLine(TxtConnDiscord, "Discord", result.Discord);
+            }
+            finally
+            {
+                BtnRecheckConnection.IsEnabled = true;
+            }
+        }
+
+        private void SetConnectionLine(TextBlock target, string platformLabel, PlatformSendResult? r)
+        {
+            if (r == null) return;
+
+            if (!r.Attempted)
+            {
+                target.Text = $"{platformLabel}: {_loc.Get("send.status.skipped")}";
+                target.Foreground = Brush("#B8A8D0");
+                return;
+            }
+
+            if (r.Succeeded)
+            {
+                target.Text = $"{platformLabel}: {_loc.Get("send.conn.ok")}";
+                target.Foreground = Brush("#55C57A");
+            }
+            else
+            {
+                target.Text = $"{platformLabel}: {_loc.Get("send.conn.failed")} — {r.Error?.Message}";
+                target.Foreground = Brush("#E0605A");
+            }
+        }
+
+        private async void BtnRecheckConnection_Click(object sender, RoutedEventArgs e) =>
+            await RunConnectionCheckAsync();
 
         protected override void OnClosed(EventArgs e)
         {

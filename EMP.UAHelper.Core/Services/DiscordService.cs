@@ -11,6 +11,7 @@ using EMP.UAHelper.Core.Models;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -111,7 +112,15 @@ namespace EMP.UAHelper.Core.Services
         //     webhookUrl — an optional channel override. An empty value means
         //     "the default channel from settings", so existing call sites
         //     (automatic notifications) keep working unchanged.
-        public async Task SendNotificationAsync(VideoInfo video, string? webhookUrl = null)
+        //     Повертає ID створеного повідомлення Discord (підтвердження
+        //     реальної відправки — Discord Webhook за замовчуванням поводиться
+        //     як fire-and-forget і нічого не підтверджує) або null, якщо канал
+        //     не налаштований (сповіщення не відправлялось взагалі).
+        //     Returns the created Discord message's ID (confirmation of an
+        //     actual send — Discord webhooks default to fire-and-forget
+        //     behavior and confirm nothing) or null if no channel is
+        //     configured (nothing was sent at all).
+        public async Task<string?> SendNotificationAsync(VideoInfo video, string? webhookUrl = null)
         {
             var templates = _templateService.GetTemplates();
             var bodyTemplates = templates.Discord;
@@ -150,9 +159,9 @@ namespace EMP.UAHelper.Core.Services
                 _timeZone,
                 video.ScheduledStartTime);
 
-            // UA: Embed будуємо через Dictionary, щоб мати змогу умовно пропустити
+            // UA: Embed будується через Dictionary, щоб мати змогу умовно пропустити
             //     image, якщо превʼю немає (ручне сповіщення без YouTube)
-            // EN: Build the embed via Dictionary so we can conditionally skip
+            // EN: The embed is built via Dictionary to allow conditionally skipping
             //     the image when there's no thumbnail (manual notification without YouTube)
             var embed = new Dictionary<string, object>
             {
@@ -178,7 +187,7 @@ namespace EMP.UAHelper.Core.Services
             if (roleMention.Length > 0)
                 payload["content"] = roleMention;
 
-            await PostAsync(payload, webhookUrl);
+            return await PostAsync(payload, webhookUrl);
         }
 
         // UA: Повністю ручна відправка — без TemplateService і без embed,
@@ -202,20 +211,19 @@ namespace EMP.UAHelper.Core.Services
         //     imagePaths — optional local image files to attach (manual mode,
         //     picked via the file browser). null/empty means unchanged
         //     behavior — the same plain JSON request as before.
-        public async Task SendRawAsync(string text, string? webhookUrl = null,
+        public async Task<string?> SendRawAsync(string text, string? webhookUrl = null,
                                         IReadOnlyList<string>? imagePaths = null)
         {
             var hasImages = imagePaths is { Count: > 0 };
-            if (string.IsNullOrWhiteSpace(text) && !hasImages) return;
+            if (string.IsNullOrWhiteSpace(text) && !hasImages) return null;
 
             if (!hasImages)
             {
                 var payload = new Dictionary<string, object> { ["content"] = text };
-                await PostAsync(payload, webhookUrl);
-                return;
+                return await PostAsync(payload, webhookUrl);
             }
 
-            await PostWithAttachmentsAsync(text, imagePaths!, webhookUrl);
+            return await PostWithAttachmentsAsync(text, imagePaths!, webhookUrl);
         }
 
         // UA: Скільки файлів можна прикріпити до одного повідомлення. Discord
@@ -242,10 +250,28 @@ namespace EMP.UAHelper.Core.Services
         //     own "files[N]" field (N starting at zero). File streams are
         //     kept open until the request completes and disposed in finally —
         //     HttpClient reads them lazily while sending, not all into memory upfront.
-        private async Task PostWithAttachmentsAsync(string text, IReadOnlyList<string> imagePaths, string? webhookUrl)
+        private async Task<string?> PostWithAttachmentsAsync(string text, IReadOnlyList<string> imagePaths, string? webhookUrl)
         {
             var target = string.IsNullOrWhiteSpace(webhookUrl) ? _webhookUrl : webhookUrl;
-            if (string.IsNullOrWhiteSpace(target)) return;
+
+            // UA: Порожній URL тут — це вже НЕ "нічого надсилати" (той випадок
+            //     відфільтрований викликачем ще до цього методу), а зіпсована
+            //     конфігурація: платформа мала отримати повідомлення, але
+            //     немає куди. Раніше тут був мовчазний "return null", який
+            //     RunAsync у NotificationDispatcher сприймав як УСПІХ — саме
+            //     того виду мовчазної "відправки в нікуди" ця ціла доробка
+            //     покликана усунути, тож тепер це явна помилка.
+            // EN: An empty URL here is NOT "nothing to send" (that case is
+            //     already filtered by the caller before this method runs) —
+            //     it's a broken configuration: the platform was supposed to
+            //     receive the message but has nowhere to send it. This used
+            //     to be a silent "return null", which NotificationDispatcher's
+            //     RunAsync treated as SUCCESS — exactly the kind of silent
+            //     "sent into the void" this whole effort exists to eliminate,
+            //     so this is now an explicit failure.
+            if (string.IsNullOrWhiteSpace(target))
+                throw new InvalidOperationException(
+                    "Discord: webhook URL не налаштовано / webhook URL is not configured.");
 
             var files = imagePaths.Take(MaxAttachmentsPerMessage).ToList();
             var payloadJson = JsonSerializer.Serialize(new Dictionary<string, object> { ["content"] = text });
@@ -266,7 +292,25 @@ namespace EMP.UAHelper.Core.Services
                     form.Add(streamContent, $"files[{i}]", Path.GetFileName(files[i]));
                 }
 
-                await Http.PostAsync(target, form);
+                // UA: "?wait=true" змушує Discord повернути реальний статус і
+                //     JSON створеного повідомлення замість fire-and-forget
+                //     204 без тіла — без цього дізнатись, чи повідомлення
+                //     справді дійшло, було б неможливо (саме це й стало причиною
+                //     дублікатів: користувач тиснув кнопку повторно, бо
+                //     застосунок за замовчуванням вважав відправку успішною)
+                // EN: "?wait=true" forces Discord to return the real status and
+                //     the created message's JSON instead of a fire-and-forget
+                //     204 with no body — without it, whether the message
+                //     actually arrived would NEVER be known (this is exactly what caused
+                //     the duplicates: the user kept pressing send because the
+                //     app silently assumed success by default)
+                using var response = await Http.PostAsync(WithWaitParam(target), form);
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                    throw new InvalidOperationException($"Discord: {BuildErrorMessage(response.StatusCode, body)}");
+
+                return ExtractMessageId(body);
             }
             finally
             {
@@ -304,14 +348,169 @@ namespace EMP.UAHelper.Core.Services
         //     a new instance per send leaves TCP connections lingering.
         private static readonly HttpClient Http = new();
 
-        private async Task PostAsync(Dictionary<string, object> payload, string? webhookUrl)
+        private async Task<string?> PostAsync(Dictionary<string, object> payload, string? webhookUrl)
         {
             var target = string.IsNullOrWhiteSpace(webhookUrl) ? _webhookUrl : webhookUrl;
-            if (string.IsNullOrWhiteSpace(target)) return;
+
+            // UA: Див. коментар до аналогічної перевірки в
+            //     PostWithAttachmentsAsync — та сама причина
+            // EN: See the comment on the equivalent check in
+            //     PostWithAttachmentsAsync — the same reasoning
+            if (string.IsNullOrWhiteSpace(target))
+                throw new InvalidOperationException(
+                    "Discord: webhook URL не налаштовано / webhook URL is not configured.");
 
             var json = JsonSerializer.Serialize(payload);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
-            await Http.PostAsync(target, content);
+
+            // UA: Див. коментар до аналогічного рядка в PostWithAttachmentsAsync —
+            //     "?wait=true" тут обов'язковий з тієї ж причини
+            // EN: See the comment on the equivalent line in PostWithAttachmentsAsync —
+            //     "?wait=true" is mandatory here for the same reason
+            using var response = await Http.PostAsync(WithWaitParam(target), content);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException($"Discord: {BuildErrorMessage(response.StatusCode, body)}");
+
+            return ExtractMessageId(body);
+        }
+
+        // UA: Додає "?wait=true" до URL вебхука. Discord webhook API за
+        //     замовчуванням поводиться як fire-and-forget — повертає 204
+        //     без тіла одразу, навіть не чекаючи, поки повідомлення реально
+        //     створено. "?wait=true" перемикає його в синхронний режим:
+        //     відповідь приходить лише після фактичного створення
+        //     повідомлення й містить його JSON (включно з "id") або помилку.
+        //     Без query-рядка додається "?", з уже наявним — "&", щоб не
+        //     зламати URL, якщо webhookUrl колись міститиме інші параметри.
+        // EN: Appends "?wait=true" to the webhook URL. The Discord webhook API
+        //     defaults to fire-and-forget behavior — it returns a 204 with no
+        //     body immediately, without even waiting for the message to
+        //     actually be created. "?wait=true" switches it to synchronous
+        //     mode: the response only arrives after the message is actually
+        //     created and contains its JSON (including "id"), or the real
+        //     error. Appends
+        //     "?" when there's no existing query string, "&" otherwise, so the
+        //     URL doesn't break if webhookUrl ever carries other parameters.
+        private static string WithWaitParam(string url) =>
+            url.Contains('?') ? $"{url}&wait=true" : $"{url}?wait=true";
+
+        // UA: Будує читабельне повідомлення про помилку з відповіді Discord.
+        //     Discord повертає JSON вигляду {"message": "...", "code": N} або,
+        //     для 429, ще й "retry_after" у секундах (саме цей випадок
+        //     користувач бачив як голий текст "Too Many Requests: retry after
+        //     8" у стандартному діалозі помилки .NET — тепер замість цього тут
+        //     формується зрозуміле повідомлення з конкретним часом очікування).
+        //     Якщо тіло не є очікуваним JSON (напр. HTML-сторінка помилки
+        //     проксі), повертаємось до сирого тіла, аби не загубити інформацію.
+        // EN: Builds a human-readable error message from Discord's response.
+        //     Discord returns JSON shaped like {"message": "...", "code": N}
+        //     or, for 429, also "retry_after" in seconds (this is exactly what
+        //     the user saw rendered as the bare text "Too Many Requests: retry
+        //     after 8" in .NET's default exception dialog — this now produces
+        //     a clear message with the actual wait time instead). If the body
+        //     isn't the expected JSON (e.g. a proxy's HTML error page), falls
+        //     back to the raw body so no information is lost.
+        private static string BuildErrorMessage(HttpStatusCode status, string body)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+                var message = root.TryGetProperty("message", out var messageProp)
+                    ? messageProp.GetString()
+                    : null;
+                var retryAfter = root.TryGetProperty("retry_after", out var retryProp)
+                    ? retryProp.GetDouble()
+                    : (double?)null;
+
+                var text = string.IsNullOrWhiteSpace(message) ? body : message;
+                return retryAfter.HasValue
+                    ? $"{(int)status} — {text} (повторити через {retryAfter.Value:0.#} с / retry after {retryAfter.Value:0.#}s)"
+                    : $"{(int)status} — {text}";
+            }
+            catch (Exception)
+            {
+                // UA: Будь-яка проблема розбору (не лише невалідний JSON, а й,
+                //     наприклад, несподіваний тип значення в полі) не повинна
+                //     ховати сам факт помилки — просто повертається сире тіло
+                // EN: Any parsing problem (not just invalid JSON, but also,
+                //     say, an unexpected value type in a field) must not hide
+                //     the failure itself — just fall back to the raw body
+                return string.IsNullOrWhiteSpace(body) ? $"{(int)status}" : $"{(int)status}: {body}";
+            }
+        }
+
+        // UA: Витягує "id" створеного повідомлення з успішної відповіді
+        //     Discord (доступний лише з "?wait=true"). Повертає null, якщо
+        //     поле відсутнє чи тіло не є JSON — викликач має сприймати null як
+        //     "відправлено, але ID підтвердження недоступне", а не як помилку:
+        //     сама відправка на цьому етапі вже відбулась (IsSuccessStatusCode
+        //     перевірено раніше).
+        // EN: Extracts the created message's "id" from a successful Discord
+        //     response (only available with "?wait=true"). Returns null if the
+        //     field is missing or the body isn't JSON — the caller should treat
+        //     null as "sent, but no confirmation ID available", not as an
+        //     error: the send itself already succeeded at this point
+        //     (IsSuccessStatusCode was already checked).
+        // UA: Перевірка з'єднання БЕЗ фактичної відправки — GET на сам URL
+        //     вебхука (не POST). Discord повертає інформацію про вебхук
+        //     (200), якщо URL дійсний, або помилку (401/404 — токен
+        //     відкликано чи канал видалено), якщо ні. Жодне повідомлення не
+        //     публікується, підписники каналу нічого не бачать — це той
+        //     самий "тихий" GET-запит, яким будь-хто у Discord міг би
+        //     перевірити власний вебхук вручну в браузері.
+        // EN: A connection check WITHOUT an actual send — a GET to the
+        //     webhook URL itself (not a POST). Discord returns the webhook's
+        //     info (200) if the URL is valid, or an error (401/404 — token
+        //     revoked or the channel was deleted) if not. No message is
+        //     posted, channel subscribers see nothing — this is the same
+        //     "silent" GET request anyone on Discord could use to check
+        //     their own webhook by hand in a browser.
+        public async Task<(bool Ok, string? Error)> CheckConnectionAsync(string? webhookUrl = null)
+        {
+            var target = string.IsNullOrWhiteSpace(webhookUrl) ? _webhookUrl : webhookUrl;
+            if (string.IsNullOrWhiteSpace(target))
+                return (false, "Discord: webhook URL не налаштовано / webhook URL is not configured.");
+
+            try
+            {
+                using var response = await Http.GetAsync(target);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    return (false, $"Discord: {BuildErrorMessage(response.StatusCode, body)}");
+                }
+
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Discord: {ex.Message}");
+            }
+        }
+
+        private static string? ExtractMessageId(string body)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                return doc.RootElement.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+            }
+            catch (Exception)
+            {
+                // UA: Навмисно перехоплюється БУДЬ-який виняток розбору, не лише
+                //     JsonException — це успішний шлях (IsSuccessStatusCode
+                //     уже true), тож навіть несподіваний тип значення "id"
+                //     не повинен перетворити справжній успіх на хибний "провал"
+                // EN: Deliberately catches ANY parsing exception, not just
+                //     JsonException — this is the success path
+                //     (IsSuccessStatusCode is already true), so even an
+                //     unexpected type for "id" must not turn a genuine
+                //     success into a false "failure"
+                return null;
+            }
         }
     }
 }

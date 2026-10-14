@@ -326,6 +326,36 @@
                 <Button x:Name="BtnAddChannel" Style="{StaticResource RevealButton}"
                         HorizontalAlignment="Left" Width="Auto" Padding="12,0"
                         Margin="0,6,0,0" Click="BtnAddChannel_Click"/>
+
+                <!-- UA: Збережені ролі Discord. Той самий підхід, що й у
+                         додаткових каналах вище: рядки будуються з коду, бо
+                         їх кількість довільна; порожній список за
+                         замовчуванням нічого не змінює для наявних
+                         інсталяцій. ID ролі — НЕ секрет (на відміну від URL
+                         вебхука), тож тут звичайний TextBox без маскування.
+                     EN: Saved Discord roles. Same approach as the extra
+                         channels above: rows are built from code because
+                         their count is arbitrary; an empty list by default
+                         changes nothing for existing installs. A role ID is
+                         NOT a secret (unlike a webhook URL), so this is a
+                         plain, unmasked TextBox. -->
+                <Rectangle Height="1" Fill="#3D2B5E" Margin="0,14,0,0"/>
+                <TextBlock x:Name="TxtDcRoles" Style="{StaticResource FieldLabel}"/>
+                <TextBlock x:Name="TxtDcRolesHint" Style="{StaticResource FieldHint}"/>
+
+                <Grid Margin="0,4,0,3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="TxtDcRoleColName" Grid.Column="0" Style="{StaticResource FieldHint}"/>
+                    <TextBlock x:Name="TxtDcRoleColId" Grid.Column="1" Style="{StaticResource FieldHint}" Margin="6,0,0,0"/>
+                </Grid>
+                <StackPanel x:Name="PanelRoles" Margin="0,0,0,0"/>
+                <Button x:Name="BtnAddRole" Style="{StaticResource RevealButton}"
+                        HorizontalAlignment="Left" Width="Auto" Padding="12,0"
+                        Margin="0,6,0,0" Click="BtnAddRole_Click"/>
             </StackPanel>
 
             <Button x:Name="BtnSave"

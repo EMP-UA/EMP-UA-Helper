@@ -86,6 +86,9 @@ namespace EMP.UAHelper.WPF
             foreach (var extra in s.DiscordExtraWebhooks)
                 AddChannelRow(extra.Name, extra.Url);
 
+            foreach (var role in s.DiscordRoles)
+                AddRoleRow(role.Name, role.Id);
+
             TwitchUrl.Text = string.IsNullOrEmpty(s.TwitchUrl)
                 ? "https://www.twitch.tv/" : s.TwitchUrl;
 
@@ -128,6 +131,11 @@ namespace EMP.UAHelper.WPF
             TxtDcChannelColName.Text = _loc.Get("settings.dc.col_name");
             TxtDcChannelColUrl.Text = _loc.Get("settings.dc.col_url");
             BtnAddChannel.Content = _loc.Get("settings.dc.add_channel");
+            TxtDcRoles.Text = _loc.Get("settings.dc.roles");
+            TxtDcRolesHint.Text = _loc.Get("settings.dc.roles.hint");
+            TxtDcRoleColName.Text = _loc.Get("settings.dc.col_name");
+            TxtDcRoleColId.Text = _loc.Get("settings.dc.col_id");
+            BtnAddRole.Content = _loc.Get("settings.dc.add_role");
             TxtTwUrl.Text = _loc.Get("firstrun.tw.url");
             TxtTwUrlHint.Text = _loc.Get("firstrun.tw.url.hint");
             BtnSave.Content = _loc.Get("settings.save");
@@ -249,6 +257,7 @@ namespace EMP.UAHelper.WPF
                 DiscordWebhookUrl = discordWebhook.Trim(),
                 DiscordWebhookName = DiscordWebhookName.Text.Trim(),
                 DiscordExtraWebhooks = CollectExtraChannels(),
+                DiscordRoles = CollectRoles(),
                 DiscordRoleId = DiscordRoleId.Text.Trim(),
                 ChannelId = YoutubeChannelId.Text.Trim(),
                 ChannelUsername = TelegramChannel.Text.Trim(),
@@ -399,6 +408,91 @@ namespace EMP.UAHelper.WPF
                 if (url.Length == 0) continue;
 
                 result.Add(new DiscordWebhookTarget { Name = name, Url = url });
+            }
+
+            return result;
+        }
+
+        // =====================================================================
+        // UA: Збережені ролі Discord. Той самий підхід, що й у додаткових
+        //     каналах вище — рядки з коду, без масштабного маскування
+        //     (ID ролі — не секрет).
+        // EN: Saved Discord roles. Same approach as the extra channels
+        //     above — rows from code, no masking (a role ID isn't a secret).
+        // =====================================================================
+        private void BtnAddRole_Click(object sender, RoutedEventArgs e)
+            => AddRoleRow(string.Empty, string.Empty);
+
+        private void AddRoleRow(string name, string id)
+        {
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var nameBox = new TextBox
+            {
+                Text = name,
+                Style = (Style)FindResource("InputField"),
+                Tag = "name"
+            };
+            Grid.SetColumn(nameBox, 0);
+
+            var idBox = new TextBox
+            {
+                Text = id,
+                Style = (Style)FindResource("InputField"),
+                Margin = new Thickness(6, 0, 0, 0),
+                Tag = "id"
+            };
+            Grid.SetColumn(idBox, 1);
+
+            var removeButton = new Button
+            {
+                Content = "✕",
+                Style = (Style)FindResource("RevealButton"),
+                Margin = new Thickness(6, 0, 0, 0),
+                ToolTip = _loc.Get("settings.dc.remove_role")
+            };
+            Grid.SetColumn(removeButton, 2);
+            removeButton.Click += (_, _) => PanelRoles.Children.Remove(row);
+
+            row.Children.Add(nameBox);
+            row.Children.Add(idBox);
+            row.Children.Add(removeButton);
+
+            PanelRoles.Children.Add(row);
+        }
+
+        // UA: Рядки без ID відкидаємо мовчки — та ж логіка, що й для каналів
+        //     без URL (CollectExtraChannels вище). Назва без ID сенсу не має;
+        //     ID без назви — цілком (у пікері з'явиться сам ID).
+        //     ID ролі — не числовий Snowflake на цьому рівні: валідація
+        //     формату (лише ASCII-цифри) лишається на DiscordService.FormatMention,
+        //     яка вже мовчки відкидає некоректний ID, тож тут повторювати цю
+        //     перевірку не потрібно.
+        // EN: Rows without an ID are dropped silently — same logic as
+        //     channels without a URL (CollectExtraChannels above). A name
+        //     without an ID is meaningless; an ID without a name is fine (the
+        //     picker will just show the bare ID).
+        //     The role ID isn't validated as a numeric snowflake at this
+        //     level — format validation (ASCII digits only) already lives in
+        //     DiscordService.FormatMention, which silently drops an invalid
+        //     ID, so repeating that check here isn't necessary.
+        private List<DiscordRoleTarget> CollectRoles()
+        {
+            var result = new List<DiscordRoleTarget>();
+
+            foreach (var row in PanelRoles.Children.OfType<Grid>())
+            {
+                var name = row.Children.OfType<TextBox>()
+                    .FirstOrDefault(b => (b.Tag as string) == "name")?.Text.Trim() ?? string.Empty;
+                var id = row.Children.OfType<TextBox>()
+                    .FirstOrDefault(b => (b.Tag as string) == "id")?.Text.Trim() ?? string.Empty;
+
+                if (id.Length == 0) continue;
+
+                result.Add(new DiscordRoleTarget { Name = name, Id = id });
             }
 
             return result;

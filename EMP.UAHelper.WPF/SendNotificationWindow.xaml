@@ -181,6 +181,20 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <!-- UA: Кнопки панелі форматування (B/I/U/S/код/спойлер) над полями
+                 ручного режиму — компактніші за IconButton (той зроблений під
+                 одну емодзі-іконку 42x38, тут текст на 5 кнопок поспіль)
+             EN: Formatting toolbar buttons (B/I/U/S/code/spoiler) above the
+                 manual-mode fields — more compact than IconButton (sized for
+                 a single emoji icon; here it's text across 6 buttons in a row) -->
+        <Style x:Key="FormatToolButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+        </Style>
     </Window.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -214,6 +228,35 @@
                        Foreground="#B8A8D0" FontSize="13" Margin="0,6,0,0"
                        TextWrapping="Wrap"/>
 
+            <!-- UA: Перевірка з'єднання з Telegram/Discord ДО фактичної
+                     відправки — лише read-only запити (GetMe/GetChat,
+                     GET вебхука), нічого не публікується і не видно
+                     підписникам каналу. Запускається автоматично при
+                     відкритті вікна, повторно — за кнопкою 🔄. Показується
+                     незалежно від режиму (шаблон/ручний), бо дані
+                     облікового запису спільні для обох.
+                 EN: Connection check with Telegram/Discord BEFORE an
+                     actual send — read-only requests only (GetMe/GetChat,
+                     webhook GET), nothing is posted or visible to channel
+                     subscribers. Runs automatically when the window
+                     opens, again via the 🔄 button. Shown regardless of
+                     mode (template/manual), since account credentials
+                     are shared between both. -->
+            <Grid x:Name="PanelConnectionCheck" Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock x:Name="TxtConnTelegram" Style="{StaticResource FieldHint}" FontSize="13"/>
+                    <TextBlock x:Name="TxtConnDiscord" Style="{StaticResource FieldHint}" FontSize="13"/>
+                </StackPanel>
+                <Button x:Name="BtnRecheckConnection" Grid.Column="1" Content="🔄"
+                        Style="{StaticResource FormatToolButton}"
+                        VerticalAlignment="Top"
+                        Click="BtnRecheckConnection_Click"/>
+            </Grid>
+
             <!-- UA: Перемикач повністю ручного режиму — вимикає будь-яку
                      підстановку шаблону, відправляється рівно те, що введено
                      в полях нижче, окремо для кожної платформи
@@ -225,8 +268,8 @@
             <TextBlock x:Name="TxtRawModeHint" Style="{StaticResource FieldHint}"/>
 
             <!-- UA: Вибір Discord-каналу. Увесь блок існує лише якщо в
-                     налаштуваннях заведено більше одного каналу — при одному
-                     каналі вікно виглядає точно як раніше, тобто наявним
+                     налаштуваннях заведено більше одного каналу — якщо канал
+                     лише один, вікно виглядає точно як раніше, тобто наявним
                      користувачам нічого не додається "просто так".
                      Типово надсилаємо в основний канал: галочка потрібна саме
                      щоб змінити канал була свідома дія, а не випадковий клік
@@ -302,8 +345,8 @@
             <TextBlock x:Name="TxtPreviewEmpty" Style="{StaticResource FieldHint}" Visibility="Collapsed"/>
 
             <!-- UA: Банер статусу завантаження списку з YouTube. Свідомо ЗЗОВНІ
-                     PanelPickerRow: той рядок ховається при увімкненому
-                     автопідборі, і повідомлення про помилку разом з ним ставало
+                     PanelPickerRow: той рядок ховається, коли автопідбір
+                     увімкнено, і повідомлення про помилку разом з ним ставало
                      невидимим саме в найпоширенішому сценарії — вікно виглядало
                      просто порожнім, без жодного пояснення чому.
                      Кольори фону/рамки й іконка призначаються з code-behind
@@ -500,9 +543,44 @@
 
                 <StackPanel x:Name="PanelRawTelegram">
                     <TextBlock x:Name="TxtRawTelegramLabel" Style="{StaticResource FieldLabel}"/>
+
+                    <!-- UA: Панель форматування — кнопка застосовує розмітку до
+                             виділеного тексту, або, якщо нічого не виділено,
+                             вставляє пару тегів/символів на місці курсора
+                         EN: A formatting toolbar — a button applies the markup
+                             to the selected text, or, if nothing is selected,
+                             inserts the pair of tags/symbols at the caret -->
+                    <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+                        <Button Content="B" Tag="b" Style="{StaticResource FormatToolButton}"
+                                Click="FormatTelegram_Click" x:Name="BtnFmtTgBold"/>
+                        <Button Content="I" Tag="i" Style="{StaticResource FormatToolButton}"
+                                Click="FormatTelegram_Click" x:Name="BtnFmtTgItalic"/>
+                        <Button Content="U" Tag="u" Style="{StaticResource FormatToolButton}"
+                                Click="FormatTelegram_Click" x:Name="BtnFmtTgUnderline"/>
+                        <Button Content="S" Tag="s" Style="{StaticResource FormatToolButton}"
+                                Click="FormatTelegram_Click" x:Name="BtnFmtTgStrike"/>
+                        <Button Content="&lt;/&gt;" Tag="code" Style="{StaticResource FormatToolButton}"
+                                Click="FormatTelegram_Click" x:Name="BtnFmtTgCode"/>
+                        <Button Content="🙈" Tag="spoiler" Style="{StaticResource FormatToolButton}"
+                                Click="FormatTelegram_Click" x:Name="BtnFmtTgSpoiler"/>
+                        <Button Content="🔗" Tag="link" Style="{StaticResource FormatToolButton}"
+                                Click="FormatTelegram_Click" x:Name="BtnFmtTgLink"/>
+                    </StackPanel>
+
                     <TextBox x:Name="RawTelegramInput" Style="{StaticResource InputField}"
                              Height="140" TextWrapping="Wrap" AcceptsReturn="True"
-                             VerticalScrollBarVisibility="Auto"/>
+                             VerticalScrollBarVisibility="Auto"
+                             TextChanged="RawTelegramInput_TextChanged"/>
+                    <!-- UA: Лічильник символів — ліміт Telegram залежить від
+                             того, чи є вкладення (підпис до фото коротший за
+                             звичайний текст), тож число оновлюється і коли
+                             змінюється текст, і коли змінюється галерея
+                         EN: Character counter — Telegram's limit depends on
+                             whether there's an attachment (a photo caption is
+                             shorter than plain text), so the number updates
+                             both on text changes and on gallery changes -->
+                    <TextBlock x:Name="TxtTelegramCharCount" Style="{StaticResource FieldHint}"
+                               HorizontalAlignment="Right" Margin="0,2,0,0"/>
                     <TextBlock x:Name="TxtRawTelegramHint" Style="{StaticResource FieldHint}"/>
 
                     <!-- UA: Згенерована позначка часу для Telegram — з'являється
@@ -531,9 +609,37 @@
 
                 <StackPanel x:Name="PanelRawDiscord">
                     <TextBlock x:Name="TxtRawDiscordLabel" Style="{StaticResource FieldLabel}"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+                        <Button Content="B" Tag="b" Style="{StaticResource FormatToolButton}"
+                                Click="FormatDiscord_Click" x:Name="BtnFmtDcBold"/>
+                        <Button Content="I" Tag="i" Style="{StaticResource FormatToolButton}"
+                                Click="FormatDiscord_Click" x:Name="BtnFmtDcItalic"/>
+                        <Button Content="U" Tag="u" Style="{StaticResource FormatToolButton}"
+                                Click="FormatDiscord_Click" x:Name="BtnFmtDcUnderline"/>
+                        <Button Content="S" Tag="s" Style="{StaticResource FormatToolButton}"
+                                Click="FormatDiscord_Click" x:Name="BtnFmtDcStrike"/>
+                        <Button Content="&lt;/&gt;" Tag="code" Style="{StaticResource FormatToolButton}"
+                                Click="FormatDiscord_Click" x:Name="BtnFmtDcCode"/>
+                        <Button Content="🙈" Tag="spoiler" Style="{StaticResource FormatToolButton}"
+                                Click="FormatDiscord_Click" x:Name="BtnFmtDcSpoiler"/>
+                        <Button Content="🔗" Tag="link" Style="{StaticResource FormatToolButton}"
+                                Click="FormatDiscord_Click" x:Name="BtnFmtDcLink"/>
+                    </StackPanel>
+
                     <TextBox x:Name="RawDiscordInput" Style="{StaticResource InputField}"
                              Height="140" TextWrapping="Wrap" AcceptsReturn="True"
-                             VerticalScrollBarVisibility="Auto"/>
+                             VerticalScrollBarVisibility="Auto"
+                             TextChanged="RawDiscordInput_TextChanged"/>
+                    <!-- UA: Лічильник символів — ліміт Discord завжди 2000,
+                             незалежно від вкладень, але показаний тут так
+                             само, як для Telegram, заради однакового UI
+                         EN: Character counter — Discord's limit is always
+                             2000 regardless of attachments, but it's shown
+                             here the same way as for Telegram, for UI
+                             consistency -->
+                    <TextBlock x:Name="TxtDiscordCharCount" Style="{StaticResource FieldHint}"
+                               HorizontalAlignment="Right" Margin="0,2,0,0"/>
                     <TextBlock x:Name="TxtRawDiscordHint" Style="{StaticResource FieldHint}"/>
 
                     <!-- UA: Те саме для Discord — тег <t:...:F> (<t:...:R>),
@@ -594,6 +700,23 @@
                         </Grid>
                         <TextBlock x:Name="TxtRawMentionHint" Style="{StaticResource FieldHint}"/>
 
+                        <!-- UA: Швидкий вибір збереженої ролі (⚙️ Налаштування →
+                                 Discord → Ролі) замість ручного введення ID.
+                                 Видимий лише коли тип згадки = "Роль" і хоча б
+                                 одна роль збережена — для User/Channel чи
+                                 порожнього списку ролей нічого не змінюється
+                             EN: Quick-pick a saved role (⚙️ Settings → Discord
+                                 → Roles) instead of typing the ID by hand.
+                                 Visible only when the mention type is "Role"
+                                 and at least one role is saved — nothing
+                                 changes for User/Channel or an empty role list -->
+                        <StackPanel x:Name="PanelRoleQuickPick" Visibility="Collapsed" Margin="0,6,0,0">
+                            <TextBlock x:Name="TxtRolePickerLabel" Style="{StaticResource FieldHint}"/>
+                            <ComboBox x:Name="RawRoleCombo" Style="{StaticResource ComboField}"
+                                      ItemContainerStyle="{StaticResource ComboItemStyle}"
+                                      SelectionChanged="RawRoleCombo_SelectionChanged"/>
+                        </StackPanel>
+
                         <StackPanel x:Name="PanelRawMentionSnippet" Visibility="Collapsed" Margin="0,6,0,0">
                             <TextBlock x:Name="TxtRawMentionSnippetLabel" Style="{StaticResource PlatformPreviewLabel}"/>
                             <Grid>
@@ -635,6 +758,23 @@
 
                 <TextBlock x:Name="TxtRawEmpty" Style="{StaticResource FieldHint}" Visibility="Collapsed"/>
 
+            </StackPanel>
+
+            <!-- UA: Реальний статус останньої відправки по кожній платформі
+                     окремо — замість одного спільного "Відправлено"/"Помилка".
+                     Прихований, доки хоч раз не натиснуто "Надіслати" в цьому
+                     вікні. Якщо хоч одна увімкнена платформа не підтвердила
+                     успіх, вікно НЕ закривається автоматично — людина бачить,
+                     що саме не дійшло, і може повторити спробу
+                 EN: The real status of the last send, per platform —
+                     instead of one shared "Sent"/"Error". Hidden until
+                     "Send" has been pressed at least once in this window.
+                     If any enabled platform didn't confirm success, the
+                     window does NOT auto-close — the person sees exactly
+                     what failed and can retry -->
+            <StackPanel x:Name="PanelSendStatus" Visibility="Collapsed" Margin="0,16,0,0">
+                <TextBlock x:Name="TxtSendStatusTelegram" Style="{StaticResource FieldHint}" FontSize="14"/>
+                <TextBlock x:Name="TxtSendStatusDiscord" Style="{StaticResource FieldHint}" FontSize="14"/>
             </StackPanel>
 
             <Button x:Name="BtnSend"
