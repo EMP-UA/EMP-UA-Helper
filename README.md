@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-blue)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
 ![License](https://img.shields.io/badge/License-GPL%20v3-green)
-![Version](https://img.shields.io/badge/Version-1.5.0-8A46C1)
+![Version](https://img.shields.io/badge/Version-1.5.5-8A46C1)
 
 **UA:** Десктопний інструмент для одночасного надсилання сповіщень про трансляції та відео у Telegram і Discord одним кліком. Кожна платформа — джерело контенту (YouTube, Twitch) чи платформа сповіщень (Telegram, Discord) — вмикається і вимикається незалежно, будь-коли, без перезапуску програми.
 **EN:** A desktop tool for sending simultaneous stream and video notifications to Telegram and Discord in one click. Every platform — a content source (YouTube, Twitch) or a notification platform (Telegram, Discord) — can be toggled independently, anytime, without restarting the app.
@@ -22,7 +22,9 @@
 - **UA:** У ручному режимі — генератори готових до копіювання позначок часу (Telegram-рядок, Discord-тег) і згадок Discord (роль/користувач/канал за самим ID) / **EN:** In manual mode — generators for ready-to-copy timestamp snippets (Telegram string, Discord tag) and Discord mentions (role/user/channel by ID alone)
 - **UA:** У ручному режимі — прикріплення до 10 зображень (скріншотів, фото) до однієї публікації, спільних для Telegram і Discord; порядок можна змінити (кнопки ◀/▶ або перетягування мишею), а по кліку на мініатюру відкривається перегляд у повний розмір / **EN:** In manual mode — attach up to 10 images (screenshots, photos) to a single post, shared between Telegram and Discord; the order can be changed (◀/▶ buttons or mouse drag), and clicking a thumbnail opens a full-size preview
 - **UA:** Вікно "📡 Надіслати сповіщення" перевіряє з'єднання з увімкненими платформами ще до натискання "Надіслати" (автоматично під час відкриття й повторно за кнопкою 🔄) — лише read-only запити, нічого не публікується і не видно підписникам / **EN:** The "📡 Send Notification" window checks connectivity with the enabled platforms before "Send" is pressed (automatically on open, and again via the 🔄 button) — read-only requests only, nothing is posted or visible to subscribers
-- **UA:** Реальний статус відправки окремо для Telegram і Discord — Discord-вебхук тепер явно підтверджує доставку (замість `fire-and-forget`), а не просто мовчки вважається успішним / **EN:** A real send status for Telegram and Discord separately — the Discord webhook now explicitly confirms delivery (instead of `fire-and-forget`), rather than being silently assumed to have worked
+- **UA:** Реальний статус відправки окремо для Telegram і Discord — Discord-вебхук явно підтверджує доставку (`?wait=true`), а не вважається успішним мовчки / **EN:** A real send status for Telegram and Discord separately — the Discord webhook explicitly confirms delivery (`?wait=true`) rather than being silently assumed successful
+- **UA:** 🧪 Тестова відправка — Telegram в особистий чат з ботом, Discord у вебхук окремого тестового каналу; підписники основних каналів тесту не бачать / **EN:** 🧪 Test send — Telegram to the private chat with the bot, Discord to a separate test channel's webhook; subscribers of the main channels never see the test
+- **UA:** Окреме вікно з результатом відправки по кожній платформі — завжди, лише при помилці або ніколи (⚙️ Налаштування → Загальне) / **EN:** A separate send-result window with the result per platform — always, only on failure, or never (⚙️ Settings → General)
 - **UA:** Захист від дублікатів — повторне натискання "Надіслати" для того самого вмісту не повторює відправку на платформу, яка вже підтвердила успіх, без окремого підтвердження користувача / **EN:** Duplicate-send protection — pressing "Send" again for the same content won't resend to a platform that already confirmed success, without the user's separate confirmation
 - **UA:** У ручному режимі — лічильник символів з реальним лімітом (Telegram залежить від наявності вкладеного зображення — підпис коротший за звичайний текст). Перевищення блокує відправку на цю платформу; якщо лишається хоча б одна платформа в межах ліміту, перед відправкою запитується підтвердження часткової відправки лише туди / **EN:** In manual mode — a character counter with the real limit (Telegram's depends on whether an image is attached — a caption is shorter than plain text). Exceeding it blocks sending to that platform; if at least one platform stays within its limit, a confirmation prompt offers a partial send to just that platform
 - **UA:** У ручному режимі — швидкий вибір збереженої ролі Discord зі списку (⚙️ Налаштування) замість введення ID вручну щоразу / **EN:** In manual mode — quick-pick a saved Discord role from a list (⚙️ Settings) instead of typing the ID by hand every time
@@ -34,11 +36,11 @@
 - **UA:** Шаблони автоматично прибирають рядки з посиланнями, яких немає (наприклад, якщо Twitch вимкнено) — жодних битих посилань / **EN:** Templates automatically drop lines referencing links that aren't set (e.g. if Twitch is disabled) — no dangling links
 - **UA:** М'яке попередження, якщо вставлене посилання не схоже на YouTube чи Twitch — не блокує відправку, лише підказка / **EN:** A soft warning if the pasted link doesn't look like YouTube or Twitch — doesn't block sending, just a hint
 - **UA:** Discord embed з thumbnail, кольором і пінгом ролі / **EN:** Discord embed with thumbnail, color and role mention
-- **UA:** Telegram HTML-форматування з превью посилання / **EN:** Telegram HTML formatting with link preview
+- **UA:** Telegram HTML-форматування з превью посилання; якщо Telegram не може побудувати прев'ю YouTube, анонс автоматично йде як фото з мініатюрою (або завжди — перемикачем у налаштуваннях) / **EN:** Telegram HTML formatting with link preview; if Telegram can't build a YouTube preview, the announcement automatically goes as a photo with the thumbnail (or always — via a settings toggle)
 - **UA:** Секретні поля (токени, API-ключі, webhook URL) приховані за замовчуванням з кнопкою перегляду 👁 / **EN:** Secret fields (tokens, API keys, webhook URL) are masked by default with a 👁 reveal button
 - **UA:** Двомовний інтерфейс UA/EN у кожному вікні / **EN:** Bilingual UA/EN interface in every window
 - **UA:** Живе в треї — не заважає робочому столу / **EN:** Lives in the system tray — stays out of your way
-- **UA:** Логування помилок у файл / **EN:** Error logging to file
+- **UA:** Логування в файл (`logs/`), включно з кожним HTTP-запитом до Telegram і Discord (статус, тривалість, заголовки rate-limit, тіло помилки) — без токенів і URL вебхуків / **EN:** Logging to file (`logs/`), including every HTTP request to Telegram and Discord (status, duration, rate-limit headers, error body) — without tokens or webhook URLs
 
 ---
 
@@ -94,8 +96,8 @@ Each section has its own toggle — only fill in the platforms you actually use.
 
 ## 🕒 Часовий пояс / Timezone
 
-**UA:** І вікно першого запуску, і "⚙️ Налаштування" мають поле "Часовий пояс" — воно визначає, як інтерпретується дата/час у прикладах повідомлень, у списку кандидатів з YouTube і в позначках часу для Discord/Telegram (у ручному режимі). При першому запуску поле автоматично підставляється системною зоною цього комп'ютера — нічого обирати не обов'язково. Значення зберігається явно в `appsettings.json` і більше не змінюється саме собою, навіть якщо системний час комп'ютера пізніше переналаштують (відрядження, VPN тощо) — це свідоме рішення, щоб уже заплановані анонси не "поплили". Літній/зимовий перехід усередині обраної зони обробляється коректно й автоматично. Старі інсталяції без цього поля в `appsettings.json` і далі працюють як раніше — за київським часом.
-**EN:** Both the first-run window and "⚙️ Settings" have a "Timezone" field — it determines how the date/time is interpreted in message previews, in the YouTube candidate list, and in the Discord/Telegram timestamp snippets (manual mode). On first run, the field is auto-filled with this machine's system zone — nothing has to be picked manually. The value is saved explicitly into `appsettings.json` and never changes by itself afterward, even if the machine's system clock zone changes later (travel, VPN, etc.) — that's intentional, so already-scheduled announcements don't drift. Daylight saving transitions within the chosen zone are handled correctly and automatically. Existing installs without this field in `appsettings.json` keep working as before — on Kyiv time.
+**UA:** І вікно першого запуску, і "⚙️ Налаштування" мають поле "Часовий пояс" — воно визначає, як інтерпретується дата/час у прикладах повідомлень, у списку кандидатів з YouTube і в позначках часу для Discord/Telegram (у ручному режимі). При першому запуску поле автоматично підставляється системною зоною цього комп'ютера — нічого обирати не обов'язково. Значення зберігається явно в `appsettings.json` і не змінюється саме собою, навіть якщо системний час комп'ютера пізніше переналаштують (відрядження, VPN тощо) — це свідоме рішення, щоб уже заплановані анонси не "поплили". Літній/зимовий перехід усередині обраної зони обробляється коректно й автоматично. Якщо поля в `appsettings.json` немає, використовується київський час.
+**EN:** Both the first-run window and "⚙️ Settings" have a "Timezone" field — it determines how the date/time is interpreted in message previews, in the YouTube candidate list, and in the Discord/Telegram timestamp snippets (manual mode). On first run, the field is auto-filled with this machine's system zone — nothing has to be picked manually. The value is saved explicitly into `appsettings.json` and never changes by itself afterward, even if the machine's system clock zone changes later (travel, VPN, etc.) — that's intentional, so already-scheduled announcements don't drift. Daylight saving transitions within the chosen zone are handled correctly and automatically. If the field is missing from `appsettings.json`, Kyiv time is used.
 
 ---
 
@@ -109,7 +111,7 @@ Each section has its own toggle — only fill in the platforms you actually use.
 
 Поле "Заголовок" і тип (Live/Upcoming/Video/Short — категорія лише впливає на шаблон і колір, не привʼязана до платформи) підставляються в активні шаблони. Поле "Посилання" необов'язкове: якщо вказане — підставляється замість `{url}`; якщо порожнє — рядки шаблону з `{url}` просто не входять у повідомлення. Якщо вставлене посилання не схоже ні на YouTube, ні на Twitch — з'явиться м'яке попередження (не блокує відправку).
 
-Поля дати й часу початку трансляції (для типу Upcoming) мають кнопки 📅 (відкрити календар), 🕐 (обрати годину/хвилину) і ⏱ (підставити поточні дату/час у зоні з "⚙️ Налаштування") — набирати вручну більше не обов'язково, хоча й досі можна.
+Поля дати й часу початку трансляції (для типу Upcoming) мають кнопки 📅 (відкрити календар), 🕐 (обрати годину/хвилину) і ⏱ (підставити поточні дату/час у зоні з "⚙️ Налаштування") — набирати вручну необов'язково, але можна.
 
 ![UA: Режим за шаблоном — автопідбір за останнім опублікованим контентом / EN: Template mode — auto-pick based on the latest published content](assets/screenshots/published_dark.png)
 
@@ -121,7 +123,7 @@ The list includes not just the last ~15 entries from the YouTube RSS feed (a You
 
 The "Title" field and type (Live/Upcoming/Video/Short — the category only affects the template and color, it's not tied to a platform) are inserted into the active templates. The "Link" field is optional: if provided, it replaces `{url}`; if left empty, template lines containing `{url}` are simply omitted. A soft warning appears if the pasted link doesn't look like YouTube or Twitch (it doesn't block sending).
 
-The stream start date/time fields (for the Upcoming type) have 📅 (open a calendar), 🕐 (pick hour/minute) and ⏱ (fill in the current date/time in the zone set under "⚙️ Settings") buttons — manual typing is no longer required, though still fully supported.
+The stream start date/time fields (for the Upcoming type) have 📅 (open a calendar), 🕐 (pick hour/minute) and ⏱ (fill in the current date/time in the zone set under "⚙️ Settings") buttons — manual typing is optional but fully supported.
 
 ---
 
@@ -151,20 +153,34 @@ The same mode has optional "Stream date" and "Stream time" fields (in the timezo
 
 ### ✅ Реальний статус відправки / Real Send Status
 
-**UA:** Після натискання "📡 Надіслати" вікно показує окремий рядок статусу для кожної увімкненої платформи: "✓ відправлено", "✗ не вдалось" (з описом помилки) або "— не надсилалось" (платформа вимкнена чи поле для неї порожнє). Discord-вебхук тепер явно підтверджує доставку (`?wait=true` + перевірка відповіді) замість того, щоб мовчки вважатись успішним одразу після відправки запиту — так само, як Telegram давно робив через свій Bot API. Якщо хоч одна платформа, яку мало бути відправлено, не підтвердила успіх, вікно **не закривається автоматично** — лишається відкритим зі статусом на екрані, щоб було видно, що саме не дійшло, без потреби перевіряти це вручну в самому Telegram чи Discord.
+**UA:** Після натискання "📡 Надіслати" вікно показує окремий рядок статусу для кожної увімкненої платформи: "✓ відправлено", "✗ не вдалось" (з описом помилки) або "— не надсилалось" (платформа вимкнена чи поле для неї порожнє). Discord-вебхук явно підтверджує доставку (`?wait=true` + перевірка відповіді), як і Telegram Bot API. Якщо хоч одна платформа, яку мало бути відправлено, не підтвердила успіх, вікно **не закривається автоматично** — лишається відкритим зі статусом на екрані, щоб було видно, що саме не дійшло, без потреби перевіряти це вручну в самому Telegram чи Discord.
 
 Якщо натиснути "Надіслати" ще раз **без зміни вмісту**, а якась платформа вже підтвердила успіх минулого разу, застосунок запитає окреме підтвердження, перш ніж надсилати туди повторно — за замовчуванням повторна відправка на вже успішну платформу блокується, щоб уберегти від дублікатів. Зміна самого тексту чи вкладень скасовує цей захист — це вважається новим повідомленням.
 
-**EN:** After pressing "📡 Send", the window shows a separate status line for each enabled platform: "✓ sent", "✗ failed" (with the error), or "— not sent" (the platform is disabled, or its field was empty). The Discord webhook now explicitly confirms delivery (`?wait=true` + checking the response) instead of being silently assumed successful right after the request goes out — the same way Telegram's own Bot API already did. If any platform that was supposed to receive the message didn't confirm success, the window **does not auto-close** — it stays open with the status on screen, so what failed is visible without having to check Telegram or Discord by hand.
+**EN:** After pressing "📡 Send", the window shows a separate status line for each enabled platform: "✓ sent", "✗ failed" (with the error), or "— not sent" (the platform is disabled, or its field was empty). The Discord webhook explicitly confirms delivery (`?wait=true` + checking the response), like the Telegram Bot API. If any platform that was supposed to receive the message didn't confirm success, the window **does not auto-close** — it stays open with the status on screen, so what failed is visible without having to check Telegram or Discord by hand.
 
 If "Send" is pressed again **without changing the content**, and some platform already confirmed success last time, the app asks for a separate confirmation before sending there again — by default, resending to an already-successful platform is blocked, to guard against duplicates. Changing the text or attachments clears this protection — that's treated as a new message.
+
+### 🧪 Тестова відправка / Test Send
+
+**UA:** Галочка "🧪 Тестова відправка" у вікні "📡 Надіслати сповіщення" перенаправляє відправку: Telegram — у тестовий чат, Discord — у вебхук тестового каналу. Цілі задаються в "⚙️ Налаштування":
+- **Telegram → Тестовий чат** — числовий ID особистого чату з ботом. Напишіть боту `/start` і натисніть "🔎 Знайти мій ID" — програма знайде ID серед повідомлень, надісланих боту (Telegram зберігає їх до 24 годин).
+- **Discord → Вебхук тестового каналу** — вебхук окремого (наприклад, приватного) каналу на тому самому сервері. Вебхук Discord не може писати в особисті повідомлення.
+
+Платформа без тестової цілі в тестовому режимі не надсилається зовсім — повернення до основного каналу немає. Перевірка з'єднання перезапускається для тестових цілей, захист від дублікатів на тестову відправку не діє, вікно після неї не закривається. У лозі такі відправки позначені `[TEST]`.
+
+**EN:** The "🧪 Test send" checkbox in the "📡 Send Notification" window redirects the send: Telegram to the test chat, Discord to the test channel's webhook. The targets are set in "⚙️ Settings":
+- **Telegram → Test chat** — the numeric ID of the private chat with the bot. Send `/start` to the bot and press "🔎 Find my ID" — the app finds the ID among messages sent to the bot (Telegram keeps them for up to 24 hours).
+- **Discord → Test channel webhook** — the webhook of a separate (e.g. private) channel on the same server. A Discord webhook can't send direct messages.
+
+A platform without a test target isn't sent to at all in test mode — there's no fallback to the main channel. The connection check re-runs for the test targets, duplicate protection doesn't apply to test sends, and the window stays open afterward. Such sends are marked `[TEST]` in the log.
 
 ---
 
 > [!NOTE]
-> **UA:** Запасний шлях через YouTube Data API (кнопка 🔑 в банері помилки) на випадок збою RSS-фіду підтверджено робочим у реальних умовах (жовтень 2026, тимчасовий збій RSS-фіду YouTube): кнопка отримала список кандидатів напряму через `search.list`, включно із запланованими трансляціями (`eventType=upcoming`). Витрачає добову квоту YouTube Data API, тому запускається лише після підтвердження в діалозі, а не автоматично.
+> **UA:** Запасний шлях через YouTube Data API (кнопка 🔑 в банері помилки) на випадок збою RSS-фіду: кнопка отримує список кандидатів напряму через `search.list`, включно із запланованими трансляціями (`eventType=upcoming`). Витрачає добову квоту YouTube Data API, тому запускається лише після підтвердження в діалозі, а не автоматично.
 >
-> **EN:** The YouTube Data API fallback (the 🔑 button in the error banner) for when the RSS feed fails has been confirmed working in real conditions (October 2026, a temporary YouTube RSS feed outage): the button fetched the candidate list directly via `search.list`, including scheduled streams (`eventType=upcoming`). It spends the YouTube Data API's daily quota, so it only runs after confirming a dialog, never automatically.
+> **EN:** The YouTube Data API fallback (the 🔑 button in the error banner) for when the RSS feed fails: the button fetches the candidate list directly via `search.list`, including scheduled streams (`eventType=upcoming`). It spends the YouTube Data API's daily quota, so it only runs after confirming a dialog, never automatically.
 
 ---
 
@@ -205,8 +221,8 @@ If "Send" is pressed again **without changing the content**, and some platform a
 
 ## 📝 Історія версій / Changelog
 
-**UA:** Повна історія версій — у [CHANGELOG.md](CHANGELOG.md). Останній реліз: **v1.5.0**.
-**EN:** Full version history is in [CHANGELOG.md](CHANGELOG.md). Latest release: **v1.5.0**.
+**UA:** Повна історія версій — у [CHANGELOG.md](CHANGELOG.md). Останній реліз: **v1.5.5**.
+**EN:** Full version history is in [CHANGELOG.md](CHANGELOG.md). Latest release: **v1.5.5**.
 
 ---
 

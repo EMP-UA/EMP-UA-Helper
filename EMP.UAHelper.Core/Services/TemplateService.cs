@@ -58,20 +58,20 @@ namespace EMP.UAHelper.Core.Services
         public string Apply(string template, string title, string url,
             string twitchUrl, TimeZoneInfo timeZone, long? scheduledTime = null)
         {
-            // UA: Для Discord використовуємо Unix timestamp напряму
-            // EN: For Discord we use Unix timestamp directly
+            // UA: Для Discord використовується Unix timestamp напряму
+            // EN: For Discord the Unix timestamp is used directly
             var scheduledDiscord = scheduledTime.HasValue
                 ? scheduledTime.Value.ToString()
                 : string.Empty;
 
-            // UA: Для Telegram конвертуємо в задану зону з урахуванням літнього/зимнього часу
-            // EN: For Telegram convert to the given zone respecting daylight saving time
+            // UA: Для Telegram час конвертується в задану зону з урахуванням літнього/зимнього часу
+            // EN: For Telegram the time is converted to the given zone respecting daylight saving time
             var scheduledTelegram = scheduledTime.HasValue
                 ? FormatScheduledTelegram(scheduledTime.Value, timeZone)
                 : string.Empty;
 
-            // UA: Прибираємо рядки, що посилаються на дані яких немає
-            // EN: Strip lines that reference data which isn't available
+            // UA: Прибираються рядки, що посилаються на дані яких немає
+            // EN: Lines that reference data which isn't available
             var lines = template.Replace("\r\n", "\n").Split('\n');
             var filtered = lines.Where(line =>
                 !(string.IsNullOrEmpty(url) && line.Contains(VarUrl)) &&
@@ -119,7 +119,7 @@ namespace EMP.UAHelper.Core.Services
                 ? $"UTC-{-offset:hh\\:mm}"
                 : $"UTC+{offset:hh\\:mm}";
 
-            // UA: Формуємо дату окремо від офсету й склеюємо рядки напряму —
+            // UA: Дата формується окремо від офсету, рядки склеюються напряму —
             //     якщо передати offsetLabel (із двокрапкою всередині) як
             //     частину рядка формату для ToString, ":" там сприймається
             //     не як текст, а як роздільник часу з поточної культури, що
@@ -138,11 +138,11 @@ namespace EMP.UAHelper.Core.Services
         // UA: Готовий до вставки Discord timestamp-тег — той самий формат,
         //     що й у шаблоні Upcoming (<t:...:F> — повна дата, <t:...:R> —
         //     "через N годин"), Discord рендерить обидва варіанти в
-        //     локальному часі читача автоматично, без нашого коду
+        //     локальному часі читача автоматично
         // EN: A ready-to-paste Discord timestamp tag — the same format used
         //     in the Upcoming template (<t:...:F> — full date, <t:...:R> —
         //     "in N hours"), Discord renders both in the reader's local time
-        //     automatically, no code on our side needed
+        //     automatically
         public static string FormatScheduledDiscordSnippet(long unixSeconds) =>
             $"<t:{unixSeconds}:F> (<t:{unixSeconds}:R>)";
 

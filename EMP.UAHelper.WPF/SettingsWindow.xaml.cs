@@ -42,7 +42,7 @@ namespace EMP.UAHelper.WPF
             LoadCurrentSettings(current);
         }
 
-        // UA: Попередньо заповнюємо поля та чекбокси поточними значеннями.
+        // UA: Поля та чекбокси попередньо заповнюються поточними значеннями.
         //     Секретні поля завжди відкриваються замасковані — незалежно від
         //     того, чи вони показувались відкритими минулого разу
         // EN: Pre-fill fields and checkboxes with current values.
@@ -50,18 +50,21 @@ namespace EMP.UAHelper.WPF
         //     were shown unmasked last time
         private void LoadCurrentSettings(AppSettings s)
         {
-            // UA: Список зон і поточне значення — показуємо зону, яка
+            // UA: Список зон і поточне значення — показується зона, яка
             //     РЕАЛЬНО зараз використовується (через AppTimeZone.Resolve),
-            //     а не сирий s.TimeZoneId. Для старих appsettings.json без
-            //     цього поля це буде Київ — саме той фолбек, що й діє
-            //     насправді, тож користувач бачить правду, а не порожнє поле
-            // EN: Zone list and current value — we show the zone that's
-            //     ACTUALLY in effect right now (via AppTimeZone.Resolve),
-            //     not the raw s.TimeZoneId. For an old appsettings.json
-            //     without this field that's Kyiv — the same fallback that's
-            //     really in effect, so the user sees the truth, not a blank field
+            //     а не сирий s.TimeZoneId. Якщо в appsettings.json цього
+            //     поля немає, це буде Київ — саме той фолбек, що й діє
+            //     насправді, тож поле показує реальне значення, а не порожнє
+            // EN: Zone list and current value — the zone that's
+            //     ACTUALLY in effect right now is shown (via AppTimeZone.Resolve),
+            //     not the raw s.TimeZoneId. If appsettings.json has no
+            //     such field, that's Kyiv — the same fallback that's really
+            //     in effect, so the field shows the real value, not a blank
             TimezoneCombo.ItemsSource = AppTimeZone.AllZones();
             TimezoneCombo.SelectedValue = AppTimeZone.Resolve(s.TimeZoneId).Id;
+
+            BuildResultDialogOptions();
+            ResultDialogCombo.SelectedIndex = Array.IndexOf(ResultDialogModes, SendResultDialogMode.Normalize(s.SendResultDialog));
 
             ChkUseTelegram.IsChecked = s.UseTelegram;
             ChkUseYoutube.IsChecked = s.UseYouTube;
@@ -82,6 +85,11 @@ namespace EMP.UAHelper.WPF
             DiscordWebhookPlain.Text = webhook;
             DiscordRoleId.Text = s.DiscordRoleId;
             DiscordWebhookName.Text = s.DiscordWebhookName;
+
+            TelegramTestChatId.Text = s.TelegramTestChatId;
+            ChkThumbnailAsPhoto.IsChecked = s.TelegramThumbnailAsPhoto;
+            DiscordTestWebhookSecure.Password = s.DiscordTestWebhookUrl;
+            DiscordTestWebhookPlain.Text = s.DiscordTestWebhookUrl;
 
             foreach (var extra in s.DiscordExtraWebhooks)
                 AddChannelRow(extra.Name, extra.Url);
@@ -106,6 +114,9 @@ namespace EMP.UAHelper.WPF
             TxtGroupGeneral.Text = _loc.Get("settings.group.general");
             TxtTimezoneLabel.Text = _loc.Get("settings.timezone.label");
             TxtTimezoneHint.Text = _loc.Get("settings.timezone.hint");
+            TxtResultDialogLabel.Text = _loc.Get("settings.result_dialog.label");
+            TxtResultDialogHint.Text = _loc.Get("settings.result_dialog.hint");
+            BuildResultDialogOptions();
             TxtGroupContent.Text = _loc.Get("settings.group.content");
             TxtGroupNotify.Text = _loc.Get("settings.group.notify");
             TxtSectionTelegram.Text = _loc.Get("firstrun.section.telegram");
@@ -136,6 +147,13 @@ namespace EMP.UAHelper.WPF
             TxtDcRoleColName.Text = _loc.Get("settings.dc.col_name");
             TxtDcRoleColId.Text = _loc.Get("settings.dc.col_id");
             BtnAddRole.Content = _loc.Get("settings.dc.add_role");
+            TxtTgTestChat.Text = _loc.Get("settings.tg.test_chat");
+            TxtTgTestChatHint.Text = _loc.Get("settings.tg.test_chat.hint");
+            BtnFindTestChat.Content = _loc.Get("settings.tg.test_chat.find");
+            ChkThumbnailAsPhoto.Content = _loc.Get("settings.tg.thumbnail_as_photo");
+            TxtThumbnailAsPhotoHint.Text = _loc.Get("settings.tg.thumbnail_as_photo.hint");
+            TxtDcTestWebhook.Text = _loc.Get("settings.dc.test_webhook");
+            TxtDcTestWebhookHint.Text = _loc.Get("settings.dc.test_webhook.hint");
             TxtTwUrl.Text = _loc.Get("firstrun.tw.url");
             TxtTwUrlHint.Text = _loc.Get("firstrun.tw.url.hint");
             BtnSave.Content = _loc.Get("settings.save");
@@ -149,6 +167,35 @@ namespace EMP.UAHelper.WPF
             var inactive = new SolidColorBrush(Color.FromRgb(0x1A, 0x14, 0x25));
             BtnUA.Background = _loc.Language == UiLanguage.UA ? active : inactive;
             BtnEN.Background = _loc.Language == UiLanguage.EN ? active : inactive;
+        }
+
+        // UA: Режими вікна результату — порядок збігається з порядком підписів
+        //     у ResultDialogCombo. ComboBox прив'язаний до рядків-підписів, а
+        //     значення береться за індексом (ComboField не показує
+        //     DisplayMemberPath для об'єктів у закритому стані).
+        // EN: The result-window modes — the order matches the label order in
+        //     ResultDialogCombo. The ComboBox is bound to label strings and the
+        //     value is taken by index (ComboField doesn't show DisplayMemberPath
+        //     for objects in the closed state).
+        private static readonly string[] ResultDialogModes =
+            { SendResultDialogMode.Always, SendResultDialogMode.Failures, SendResultDialogMode.Never };
+
+        // UA: Підписи локалізовані, тож список перебудовується і під час зміни
+        //     мови, зберігаючи вибраний індекс
+        // EN: Labels are localized, so the list is rebuilt on a language
+        //     switch too, keeping the selected index
+        private void BuildResultDialogOptions()
+        {
+            var selected = ResultDialogCombo.SelectedIndex;
+
+            ResultDialogCombo.ItemsSource = new[]
+            {
+                _loc.Get("settings.result_dialog.always"),
+                _loc.Get("settings.result_dialog.failures"),
+                _loc.Get("settings.result_dialog.never")
+            };
+
+            ResultDialogCombo.SelectedIndex = selected >= 0 ? selected : 1;
         }
 
         private void BtnUA_Click(object sender, RoutedEventArgs e)
@@ -200,6 +247,58 @@ namespace EMP.UAHelper.WPF
         private void ToggleDiscordWebhook_Click(object sender, RoutedEventArgs e)
             => TogglePasswordVisibility(DiscordWebhookSecure, DiscordWebhookPlain, BtnToggleDiscordWebhook);
 
+        private void ToggleDiscordTestWebhook_Click(object sender, RoutedEventArgs e)
+            => TogglePasswordVisibility(DiscordTestWebhookSecure, DiscordTestWebhookPlain, BtnToggleDiscordTestWebhook);
+
+        // UA: Пошук власного chat ID: токен береться з поля вікна (може бути
+        //     ще не збереженим). Якщо знайдено кілька особистих чатів,
+        //     підставляється останній, а повний список показується в
+        //     повідомленні
+        // EN: Own chat ID lookup: the token is taken from the window field
+        //     (it may not be saved yet). If several private chats are found,
+        //     the last one is filled in and the full list is shown in the
+        //     message
+        private async void BtnFindTestChat_Click(object sender, RoutedEventArgs e)
+        {
+            var token = SecureValue(TelegramTokenSecure, TelegramTokenPlain).Trim();
+            if (token.Length == 0)
+            {
+                System.Windows.MessageBox.Show(_loc.Get("settings.tg.test_chat.no_token"), _loc.Get("app.name"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            BtnFindTestChat.IsEnabled = false;
+            try
+            {
+                var chats = await TelegramService.FindPrivateChatsAsync(token);
+                if (chats.Count == 0)
+                {
+                    System.Windows.MessageBox.Show(_loc.Get("settings.tg.test_chat.not_found"), _loc.Get("app.name"),
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var chosen = chats[^1];
+                TelegramTestChatId.Text = chosen.Id.ToString();
+
+                var list = string.Join("\n", chats.Select(c => $"{c.DisplayName} — {c.Id}"));
+                System.Windows.MessageBox.Show(
+                    string.Format(_loc.Get("settings.tg.test_chat.found"), list, chosen.Id),
+                    _loc.Get("app.name"), MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(
+                    string.Format(_loc.Get("settings.tg.test_chat.error"), ex.Message),
+                    _loc.Get("app.name"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                BtnFindTestChat.IsEnabled = true;
+            }
+        }
+
         private static string SecureValue(PasswordBox secure, TextBox plain)
             => plain.Visibility == Visibility.Visible ? plain.Text : secure.Password;
 
@@ -250,6 +349,32 @@ namespace EMP.UAHelper.WPF
                 return;
             }
 
+            // UA: Тестові цілі необов'язкові; якщо задані — chat ID має бути
+            //     числом (особистий чат/група) або @username, вебхук — URL
+            //     вебхука Discord
+            // EN: Test targets are optional; if set, the chat ID must be a
+            //     number (private chat/group) or an @username, and the webhook
+            //     must be a Discord webhook URL
+            var testChatId = TelegramTestChatId.Text.Trim();
+            var testWebhook = SecureValue(DiscordTestWebhookSecure, DiscordTestWebhookPlain).Trim();
+
+            bool testChatInvalid = testChatId.Length > 0
+                && !long.TryParse(testChatId, out _)
+                && !(testChatId.StartsWith('@') && testChatId.Length > 1);
+
+            bool testWebhookInvalid = testWebhook.Length > 0
+                && !testWebhook.StartsWith("https://discord.com/api/webhooks/", StringComparison.OrdinalIgnoreCase)
+                && !testWebhook.StartsWith("https://discordapp.com/api/webhooks/", StringComparison.OrdinalIgnoreCase);
+
+            if (testChatInvalid || testWebhookInvalid)
+            {
+                System.Windows.MessageBox.Show(
+                    _loc.Get("settings.test.validation"),
+                    _loc.Get("app.name"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             var settings = new AppSettings
             {
                 TelegramBotToken = telegramToken.Trim(),
@@ -258,6 +383,12 @@ namespace EMP.UAHelper.WPF
                 DiscordWebhookName = DiscordWebhookName.Text.Trim(),
                 DiscordExtraWebhooks = CollectExtraChannels(),
                 DiscordRoles = CollectRoles(),
+                TelegramTestChatId = testChatId,
+                TelegramThumbnailAsPhoto = ChkThumbnailAsPhoto.IsChecked == true,
+                SendResultDialog = ResultDialogCombo.SelectedIndex >= 0
+                    ? ResultDialogModes[ResultDialogCombo.SelectedIndex]
+                    : SendResultDialogMode.Failures,
+                DiscordTestWebhookUrl = testWebhook,
                 DiscordRoleId = DiscordRoleId.Text.Trim(),
                 ChannelId = YoutubeChannelId.Text.Trim(),
                 ChannelUsername = TelegramChannel.Text.Trim(),
@@ -283,22 +414,17 @@ namespace EMP.UAHelper.WPF
         // UA: Додаткові Discord-канали. Рядки будуються з коду, бо їх кількість
         //     довільна — описати їх статично в XAML неможливо. Кожен рядок це
         //     назва + URL (замасковано, як основний вебхук — див. нижче) +
-        //     кнопка видалення; жодного зайвого стану не зберігаємо, значення
+        //     кнопка видалення; зайвого стану немає, значення
         //     читаються прямо з полів при збереженні.
-        //     Раніше URL тут був відкритим текстом, на відміну від основного
-        //     вебхука — за реальним використанням це виявилось нелогічним і
-        //     небезпечним (URL веб-хука дає повний доступ до відправки
-        //     повідомлень у канал), тож маскування зробили однаковим для
-        //     всіх URL-полів.
+        //     Маскування однакове для всіх URL-полів: URL вебхука дає повний
+        //     доступ до відправки повідомлень у канал.
         // EN: Additional Discord channels. Rows are built from code because
         //     their count is arbitrary — they can't be declared statically in
         //     XAML. Each row is name + URL (masked, like the primary webhook —
         //     see below) + a delete button; no extra state is kept, values are
         //     read straight from the fields on save.
-        //     The URL used to be shown in the clear here, unlike the primary
-        //     webhook — real-world use showed that inconsistent and unsafe (a
-        //     webhook URL grants full access to post into that channel), so
-        //     masking is now the same for every URL field.
+        //     Masking is the same for every URL field: a webhook URL grants
+        //     full access to post into the channel.
         // =====================================================================
         private void BtnAddChannel_Click(object sender, RoutedEventArgs e)
             => AddChannelRow(string.Empty, string.Empty);
@@ -373,11 +499,11 @@ namespace EMP.UAHelper.WPF
             PanelExtraChannels.Children.Add(row);
         }
 
-        // UA: Рядки без URL відкидаємо мовчки — порожній рядок, який людина
+        // UA: Рядки без URL відкидаються мовчки — порожній рядок, який людина
         //     додала й передумала заповнювати, не має ставати "каналом", що
         //     нікуди не надсилає. Назва без URL сенсу не має, URL без назви —
         //     цілком (підставиться локалізоване "Канал без назви").
-        //     URL читаємо через той самий SecureValue(), що й основний
+        //     URL читається через той самий SecureValue(), що й основний
         //     вебхук — він сам визначає, яке з двох полів (приховане чи
         //     розкрите) зараз актуальне.
         // EN: Rows without a URL are dropped silently — an empty row the person
@@ -464,7 +590,7 @@ namespace EMP.UAHelper.WPF
             PanelRoles.Children.Add(row);
         }
 
-        // UA: Рядки без ID відкидаємо мовчки — та ж логіка, що й для каналів
+        // UA: Рядки без ID відкидаються мовчки — та ж логіка, що й для каналів
         //     без URL (CollectExtraChannels вище). Назва без ID сенсу не має;
         //     ID без назви — цілком (у пікері з'явиться сам ID).
         //     ID ролі — не числовий Snowflake на цьому рівні: валідація

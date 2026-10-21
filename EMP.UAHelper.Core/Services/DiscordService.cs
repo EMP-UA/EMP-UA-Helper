@@ -62,7 +62,7 @@ namespace EMP.UAHelper.Core.Services
             // UA: ID у Discord — це snowflake, тобто виключно цифри ASCII 0-9.
             //     Перевірка дешева, а рятує від найтиповішого випадку: людина
             //     копіює з Discord готовий тег "<@&123>" замість самого ID, і
-            //     без перевірки ми б згенерували "<@&<@&123>>".
+            //     без перевірки згенерувалось би "<@&<@&123>>".
             //     Саме IsAsciiDigit, а не IsDigit: IsDigit вважає цифрою будь-який
             //     символ Unicode-категорії Nd, тобто пропустив би, наприклад,
             //     арабо-індійські "١٢٣" — вони виглядають як число, але Discord
@@ -70,7 +70,7 @@ namespace EMP.UAHelper.Core.Services
             // EN: A Discord ID is a snowflake, i.e. ASCII digits 0-9 only. The
             //     check is cheap and guards the most typical case: the person
             //     copies a ready tag "<@&123>" out of Discord instead of the
-            //     bare ID, and without the check we'd generate "<@&<@&123>>".
+            //     bare ID, and without the check "<@&<@&123>>" would be generated.
             //     IsAsciiDigit specifically, not IsDigit: IsDigit treats any
             //     Unicode category Nd character as a digit, so it would let
             //     through e.g. Arabic-Indic "١٢٣" — which looks like a number
@@ -95,8 +95,9 @@ namespace EMP.UAHelper.Core.Services
         private const int ColorShort = 0xC989F3; // UA: Світло-фіолетовий EMP / EN: EMP Light Purple
 
         public DiscordService(string webhookUrl, string twitchUrl, string roleId,
-            string timeZoneId, TemplateService templateService)
+            string timeZoneId, TemplateService templateService, CrashLogService crashLogService)
         {
+            _http = new HttpClient(HttpLogHandler.ForDiscord(crashLogService));
             _webhookUrl = webhookUrl;
             _twitchUrl = twitchUrl;
             _roleId = roleId;
@@ -126,7 +127,7 @@ namespace EMP.UAHelper.Core.Services
             var bodyTemplates = templates.Discord;
             var titleTemplates = templates.DiscordTitles;
 
-            // UA: Обираємо шаблони залежно від типу контенту
+            // UA: Вибір шаблонів залежно від типу контенту
             // EN: Select templates based on content type
             var (titleTemplate, bodyTemplate, color) = video.Type switch
             {
@@ -141,7 +142,7 @@ namespace EMP.UAHelper.Core.Services
                 _ => throw new ArgumentOutOfRangeException()
             };
 
-            // UA: Передаємо ScheduledStartTime для підстановки Unix timestamp у шаблон
+            // UA: ScheduledStartTime передається для підстановки Unix timestamp у шаблон
             // EN: Pass ScheduledStartTime for Unix timestamp substitution in template
             var embedTitle = _templateService.Apply(
                 titleTemplate,
@@ -181,7 +182,7 @@ namespace EMP.UAHelper.Core.Services
                 ["embeds"] = new[] { embed }
             };
 
-            // UA: Пінг ролі додаємо лише якщо RoleId заданий
+            // UA: Пінг ролі додається лише якщо RoleId заданий
             // EN: Add the role mention only if RoleId is set
             var roleMention = FormatMention(MentionKind.Role, _roleId);
             if (roleMention.Length > 0)
@@ -206,11 +207,10 @@ namespace EMP.UAHelper.Core.Services
         //     Discord's content length limit is 2000 characters
         //     imagePaths — необов'язкові локальні файли зображень для
         //     прикріплення (ручний режим, вибираються через провідник).
-        //     null/порожній список — поведінка не змінюється, той самий
-        //     JSON-запит, що й раніше.
+        //     null/порожній список — звичайний JSON-запит без вкладень.
         //     imagePaths — optional local image files to attach (manual mode,
-        //     picked via the file browser). null/empty means unchanged
-        //     behavior — the same plain JSON request as before.
+        //     picked via the file browser). null/empty means a plain JSON
+        //     request without attachments.
         public async Task<string?> SendRawAsync(string text, string? webhookUrl = null,
                                         IReadOnlyList<string>? imagePaths = null)
         {
@@ -241,8 +241,8 @@ namespace EMP.UAHelper.Core.Services
         // UA: Multipart-запит з вкладеннями. Discord Webhook API вимагає
         //     саме такої форми (не звичайний JSON) для файлів: текстова
         //     частина йде в полі "payload_json", кожен файл — в окремому полі
-        //     "files[N]" (N з нуля). Потоки читання файлів тримаємо відкритими
-        //     до завершення запиту й закриваємо в finally — HttpClient читає
+        //     "files[N]" (N з нуля). Потоки читання файлів лишаються відкритими
+        //     до завершення запиту й закриваються в finally — HttpClient читає
         //     їх лінькво під час відправки, а не наперед у пам'ять.
         // EN: A multipart request with attachments. The Discord Webhook API
         //     requires exactly this shape (not plain JSON) for files: the
@@ -254,21 +254,19 @@ namespace EMP.UAHelper.Core.Services
         {
             var target = string.IsNullOrWhiteSpace(webhookUrl) ? _webhookUrl : webhookUrl;
 
-            // UA: Порожній URL тут — це вже НЕ "нічого надсилати" (той випадок
+            // UA: Порожній URL тут — це НЕ "нічого надсилати" (той випадок
             //     відфільтрований викликачем ще до цього методу), а зіпсована
             //     конфігурація: платформа мала отримати повідомлення, але
-            //     немає куди. Раніше тут був мовчазний "return null", який
-            //     RunAsync у NotificationDispatcher сприймав як УСПІХ — саме
-            //     того виду мовчазної "відправки в нікуди" ця ціла доробка
-            //     покликана усунути, тож тепер це явна помилка.
+            //     немає куди. Мовчазний "return null" RunAsync у
+            //     NotificationDispatcher сприйняв би як УСПІХ, тому це явна
+            //     помилка.
             // EN: An empty URL here is NOT "nothing to send" (that case is
             //     already filtered by the caller before this method runs) —
             //     it's a broken configuration: the platform was supposed to
-            //     receive the message but has nowhere to send it. This used
-            //     to be a silent "return null", which NotificationDispatcher's
-            //     RunAsync treated as SUCCESS — exactly the kind of silent
-            //     "sent into the void" this whole effort exists to eliminate,
-            //     so this is now an explicit failure.
+            //     receive the message but has nowhere to send it. A silent
+            //     "return null" would be treated as SUCCESS by
+            //     NotificationDispatcher's RunAsync, so this is an explicit
+            //     failure.
             if (string.IsNullOrWhiteSpace(target))
                 throw new InvalidOperationException(
                     "Discord: webhook URL не налаштовано / webhook URL is not configured.");
@@ -295,16 +293,12 @@ namespace EMP.UAHelper.Core.Services
                 // UA: "?wait=true" змушує Discord повернути реальний статус і
                 //     JSON створеного повідомлення замість fire-and-forget
                 //     204 без тіла — без цього дізнатись, чи повідомлення
-                //     справді дійшло, було б неможливо (саме це й стало причиною
-                //     дублікатів: користувач тиснув кнопку повторно, бо
-                //     застосунок за замовчуванням вважав відправку успішною)
+                //     справді дійшло, неможливо
                 // EN: "?wait=true" forces Discord to return the real status and
                 //     the created message's JSON instead of a fire-and-forget
                 //     204 with no body — without it, whether the message
-                //     actually arrived would NEVER be known (this is exactly what caused
-                //     the duplicates: the user kept pressing send because the
-                //     app silently assumed success by default)
-                using var response = await Http.PostAsync(WithWaitParam(target), form);
+                //     actually arrived can't be known
+                using var response = await _http.PostAsync(WithWaitParam(target), form);
                 var body = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
@@ -334,20 +328,22 @@ namespace EMP.UAHelper.Core.Services
             _ => "image/jpeg"
         };
 
-        // UA: Єдина точка відправки в Discord. Раніше і embed, і ручне
-        //     повідомлення дублювали серіалізацію та створення HttpClient —
-        //     тепер вибір каналу (перевизначення чи типовий) реалізований
-        //     рівно один раз, тож ці два шляхи не можуть розійтись у поведінці.
-        //     HttpClient статичний з тієї ж причини, що й у YouTubeService:
-        //     новий екземпляр на кожну відправку лишає TCP-з'єднання висіти.
-        // EN: The single Discord send point. Previously both the embed and the
-        //     manual message duplicated serialization and HttpClient creation —
-        //     now channel selection (override or default) is implemented
-        //     exactly once, so the two paths can't drift apart in behavior.
-        //     The HttpClient is static for the same reason as in YouTubeService:
-        //     a new instance per send leaves TCP connections lingering.
-        private static readonly HttpClient Http = new();
+        // UA: Один HttpClient на екземпляр сервісу (а не на кожну відправку —
+        //     новий клієнт на кожен запит лишає TCP-з'єднання висіти). Сервіс
+        //     перестворюється лише під час зміни налаштувань. Обробник
+        //     HttpLogHandler пише кожен запит до Discord у лог.
+        // EN: One HttpClient per service instance (not per send — a new client
+        //     per request leaves TCP connections lingering). The service is
+        //     only recreated when settings change. The HttpLogHandler writes
+        //     every request to Discord to the log.
+        private readonly HttpClient _http;
 
+        // UA: Єдина точка JSON-відправки в Discord — і embed, і ручне
+        //     повідомлення проходять тут, тож вибір каналу (перевизначення чи
+        //     типовий) реалізований рівно один раз
+        // EN: The single JSON send point for Discord — both the embed and the
+        //     manual message go through here, so channel selection (override
+        //     or default) is implemented exactly once
         private async Task<string?> PostAsync(Dictionary<string, object> payload, string? webhookUrl)
         {
             var target = string.IsNullOrWhiteSpace(webhookUrl) ? _webhookUrl : webhookUrl;
@@ -367,7 +363,7 @@ namespace EMP.UAHelper.Core.Services
             //     "?wait=true" тут обов'язковий з тієї ж причини
             // EN: See the comment on the equivalent line in PostWithAttachmentsAsync —
             //     "?wait=true" is mandatory here for the same reason
-            using var response = await Http.PostAsync(WithWaitParam(target), content);
+            using var response = await _http.PostAsync(WithWaitParam(target), content);
             var body = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
@@ -398,18 +394,14 @@ namespace EMP.UAHelper.Core.Services
 
         // UA: Будує читабельне повідомлення про помилку з відповіді Discord.
         //     Discord повертає JSON вигляду {"message": "...", "code": N} або,
-        //     для 429, ще й "retry_after" у секундах (саме цей випадок
-        //     користувач бачив як голий текст "Too Many Requests: retry after
-        //     8" у стандартному діалозі помилки .NET — тепер замість цього тут
-        //     формується зрозуміле повідомлення з конкретним часом очікування).
+        //     для 429, ще й "retry_after" у секундах — тоді формується
+        //     зрозуміле повідомлення з конкретним часом очікування.
         //     Якщо тіло не є очікуваним JSON (напр. HTML-сторінка помилки
-        //     проксі), повертаємось до сирого тіла, аби не загубити інформацію.
+        //     проксі), використовується сире тіло, аби не загубити інформацію.
         // EN: Builds a human-readable error message from Discord's response.
         //     Discord returns JSON shaped like {"message": "...", "code": N}
-        //     or, for 429, also "retry_after" in seconds (this is exactly what
-        //     the user saw rendered as the bare text "Too Many Requests: retry
-        //     after 8" in .NET's default exception dialog — this now produces
-        //     a clear message with the actual wait time instead). If the body
+        //     or, for 429, also "retry_after" in seconds — then a clear message
+        //     with the actual wait time is produced. If the body
         //     isn't the expected JSON (e.g. a proxy's HTML error page), falls
         //     back to the raw body so no information is lost.
         private static string BuildErrorMessage(HttpStatusCode status, string body)
@@ -476,7 +468,7 @@ namespace EMP.UAHelper.Core.Services
 
             try
             {
-                using var response = await Http.GetAsync(target);
+                using var response = await _http.GetAsync(target);
                 if (!response.IsSuccessStatusCode)
                 {
                     var body = await response.Content.ReadAsStringAsync();

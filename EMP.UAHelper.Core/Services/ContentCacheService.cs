@@ -67,7 +67,7 @@ namespace EMP.UAHelper.Core.Services
 
                 if (existing.TryGetValue(entry.VideoId, out var current))
                 {
-                    // UA: Дані могли змінитись — оновлюємо, зберігаючи оригінальний
+                    // UA: Дані могли змінитись — запис оновлюється, оригінальний
                     //     час першого локального виявлення
                     // EN: Data might have changed — update it, keeping the
                     //     original first-seen timestamp
@@ -107,7 +107,7 @@ namespace EMP.UAHelper.Core.Services
             }
             catch
             {
-                // UA: Пошкоджений/нечитабельний кеш — не критично, просто починаємо заново
+                // UA: Пошкоджений/нечитабельний кеш — не критично, кеш створюється заново
                 // EN: Corrupted/unreadable cache — not critical, just start fresh
                 return new List<ContentCacheEntry>();
             }

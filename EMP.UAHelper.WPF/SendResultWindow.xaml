@@ -1,0 +1,48 @@
+﻿<!-- Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper -->
+<!-- Donate: https://ko-fi.com/emp_ua -->
+<!-- UA: Вікно результату відправки — картка на кожну платформу з кольоровим
+     статусом, приміткою про обхідний шлях та ID повідомлення.
+     EN: Send-result window — one card per platform with a colored status,
+     a workaround note and the message ID. -->
+<Window x:Class="EMP.UAHelper.WPF.SendResultWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="760" MinWidth="560" MaxWidth="900"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="#0D0A14"
+        KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <Style x:Key="OkButton" TargetType="Button">
+            <Setter Property="Background" Value="#8A46C1"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="40,10"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#C989F3"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="28,24,28,24">
+        <TextBlock x:Name="TxtHeader" FontSize="22" FontWeight="Bold" Margin="0,0,0,18"
+                   TextWrapping="Wrap"/>
+
+        <!-- UA: Картки платформ додаються з коду / EN: Platform cards are added from code -->
+        <StackPanel x:Name="PanelRows"/>
+
+        <TextBlock x:Name="TxtSource" FontSize="15" Foreground="#C989F3"
+                   TextWrapping="Wrap" Margin="2,4,0,0" Visibility="Collapsed"/>
+
+        <Button x:Name="BtnOk" Style="{StaticResource OkButton}" IsDefault="True" IsCancel="True"
+                HorizontalAlignment="Right" Margin="0,22,0,0" Click="BtnOk_Click"/>
+    </StackPanel>
+</Window>

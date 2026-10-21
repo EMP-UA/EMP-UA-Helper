@@ -4,43 +4,37 @@
 // Підтримати / Donate: https://ko-fi.com/emp_ua
 // Ліцензія / License: GPL-3.0
 // =============================================================================
-// UA: Єдине місце визначення часової зони для дат трансляцій. Раніше
-//     "FLE Standard Time" (Київ) було захардкоджено в трьох різних місцях
-//     коду (TemplateService, двічі в SendNotificationWindow) — тепер уся
-//     логіка резолву в одному класі.
+// UA: Єдине місце визначення часової зони для дат трансляцій — уся логіка
+//     резолву в одному класі, без захардкоджених зон деінде в коді.
 //
 //     Правила:
 //     1. Якщо в AppSettings.TimeZoneId явно вказана коректна зона —
-//        використовуємо саме її.
-//     2. Якщо поле порожнє (типово — старий appsettings.json, збережений
-//        до появи цього налаштування) — падаємо назад на Київ, щоб
-//        поведінка для вже наявних інсталяцій не змінилась.
+//        використовується саме вона.
+//     2. Якщо поле порожнє або відсутнє в appsettings.json —
+//        використовується Київ.
 //     3. Системна зона (TimeZoneInfo.Local) ніколи не читається "наживо"
 //        під час роботи програми — лише один раз, як початкове значення
 //        для попереднього заповнення поля при першому запуску. Це не
 //        "здогадка" в сенсі невизначеності — дані точні (це реальна
 //        поточна зона ОС), просто вони використовуються лише як стартове
-//        значення, яке користувач може одразу змінити, а не як живе
-//        джерело правди. Свідомо: якщо комп'ютер стримера тимчасово
-//        перелаштується на іншу зону (відрядження, VPN, помилка Windows),
-//        уже збережені сповіщення не повинні "поплисти" самі собою.
+//        значення, яке можна одразу змінити, а не як живе джерело правди.
+//        Свідомо: якщо комп'ютер стримера тимчасово перелаштується на
+//        іншу зону (відрядження, VPN, помилка Windows), уже збережені сповіщення не повинні "поплисти" самі собою.
 //
-// EN: Single place that resolves the timezone for stream dates. Previously
-//     "FLE Standard Time" (Kyiv) was hardcoded in three different spots
-//     (TemplateService, twice in SendNotificationWindow) — now all the
-//     resolution logic lives in one class.
+// EN: Single place that resolves the timezone for stream dates — all the
+//     resolution logic lives in one class, with no zones hardcoded elsewhere
+//     in the code.
 //
 //     Rules:
 //     1. If AppSettings.TimeZoneId explicitly names a valid zone — use it.
-//     2. If the field is empty (typically an old appsettings.json saved
-//        before this setting existed) — fall back to Kyiv, so behavior
-//        for existing installs doesn't change.
+//     2. If the field is empty or missing in appsettings.json — fall
+//        back to Kyiv.
 //     3. The system zone (TimeZoneInfo.Local) is never read "live" while
 //        the app is running — only once, as the initial value used to
 //        pre-fill the field on first run. This isn't a "guess" in the
 //        sense of being uncertain — the data is exact (it's the OS's
-//        real current zone), it's just used only as a starting value the
-//        user can immediately change, not as a live source of truth.
+//        real current zone), it's just used only as a starting value that
+//        can be changed right away, not as a live source of truth.
 //        Intentional: if the streamer's machine temporarily reports a
 //        different zone (travel, VPN, a Windows misconfiguration),
 //        already-scheduled announcements shouldn't silently drift.
@@ -74,7 +68,7 @@ namespace EMP.UAHelper.Core.Services
                 {
                     return TimeZoneInfo.FindSystemTimeZoneById(configuredId);
                 }
-                catch (TimeZoneNotFoundException) { /* UA: падаємо на фолбек нижче / EN: fall through to the fallback below */ }
+                catch (TimeZoneNotFoundException) { /* UA: перехід до запасного варіанту нижче / EN: fall through to the fallback below */ }
                 catch (InvalidTimeZoneException) { /* UA: те саме / EN: same */ }
             }
 
@@ -103,14 +97,14 @@ namespace EMP.UAHelper.Core.Services
 
         // UA: Усі доступні на машині часові зони, відсортовані за зсувом
         //     UTC — для комбобокса вибору в UI. Мова назв (TimeZoneInfo.
-        //     DisplayName) визначається мовою самої Windows, а не нашим
+        //     DisplayName) визначається мовою самої Windows, а не
         //     LocalizationService/_loc.Language — це системні рядки ОС,
-        //     не наші, тому перемикач UA/EN у програмі на них не впливає
+        //     тому перемикач UA/EN у програмі на них не впливає
         // EN: All timezones available on the machine, sorted by UTC offset
         //     — for the selection combo box in the UI. The language of the
         //     names (TimeZoneInfo.DisplayName) is determined by Windows'
-        //     own language, not by our LocalizationService/_loc.Language —
-        //     these are OS-provided strings, not ours, so the app's UA/EN
+        //     own language, not by LocalizationService/_loc.Language —
+        //     these are OS-provided strings, so the app's UA/EN
         //     switch has no effect on them
         public static List<TimeZoneInfo> AllZones() =>
             TimeZoneInfo.GetSystemTimeZones()

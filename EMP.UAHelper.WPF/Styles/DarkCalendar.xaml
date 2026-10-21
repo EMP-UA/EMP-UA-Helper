@@ -80,7 +80,7 @@
                     <!-- UA: На відміну від CalendarDayButton, у CalendarButton
                          (кнопки навігації місяць/рік у шапці календаря) немає
                          шаблонної властивості IsSelected — компілятор XAML
-                         відхиляє такий тригер (MC4109). Лишаємо лише IsMouseOver.
+                         відхиляє такий тригер (MC4109). Залишено лише IsMouseOver.
                          EN: Unlike CalendarDayButton, CalendarButton (the
                          month/year navigation buttons in the calendar header)
                          has no template-bindable IsSelected property — the

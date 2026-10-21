@@ -22,7 +22,7 @@ namespace EMP.UAHelper.Core.Services
             TemplateService templateService,
             CrashLogService crashLogService)
         {
-            // UA: Якщо Twitch вимкнено — передаємо порожній рядок,
+            // UA: Якщо Twitch вимкнено — передається порожній рядок,
             //     щоб TemplateService.Apply прибрав відповідні рядки з шаблонів
             // EN: If Twitch is disabled — pass an empty string so
             //     TemplateService.Apply strips the corresponding template lines
@@ -38,7 +38,9 @@ namespace EMP.UAHelper.Core.Services
                     settings.ChannelUsername,
                     twitchUrl,
                     settings.TimeZoneId,
-                    templateService)
+                    templateService,
+                    crashLogService,
+                    settings.TelegramThumbnailAsPhoto)
                 : null;
 
             var discordService = settings.UseDiscord
@@ -47,7 +49,8 @@ namespace EMP.UAHelper.Core.Services
                     twitchUrl,
                     settings.DiscordRoleId,
                     settings.TimeZoneId,
-                    templateService)
+                    templateService,
+                    crashLogService)
                 : null;
 
             var dispatcher = new NotificationDispatcher(telegramService, discordService, crashLogService);

@@ -155,12 +155,11 @@
             </Setter>
         </Style>
 
-        <!-- UA: ComboItemStyle, ComboField і DarkCalendar тепер у спільному
+        <!-- UA: ComboItemStyle, ComboField і DarkCalendar — у спільних
                  App.xaml → Styles/DarkComboBox.xaml, Styles/DarkCalendar.xaml
-                 (не дублюємо тут)
-             EN: ComboItemStyle, ComboField and DarkCalendar now live in the
+             EN: ComboItemStyle, ComboField and DarkCalendar live in the
                  shared App.xaml → Styles/DarkComboBox.xaml,
-                 Styles/DarkCalendar.xaml (not duplicated here) -->
+                 Styles/DarkCalendar.xaml -->
 
         <!-- UA: Компактна квадратна кнопка-іконка — для пікерів дати/часу
                  (📅/🕐) і кнопок "зараз" (⏱) біля полів дати/часу
@@ -257,6 +256,20 @@
                         Click="BtnRecheckConnection_Click"/>
             </Grid>
 
+            <!-- UA: Тестова відправка — Telegram іде в тестовий (особистий)
+                     чат, Discord — у тестовий вебхук із налаштувань.
+                     Платформа без тестової цілі пропускається, а не
+                     надсилається в основний канал. Перевірка з'єднання вище
+                     перезапускається для тестових цілей
+                 EN: Test send — Telegram goes to the test (private) chat,
+                     Discord to the test webhook from settings. A platform
+                     without a test target is skipped rather than sent to the
+                     main channel. The connection check above re-runs for the
+                     test targets -->
+            <CheckBox x:Name="ChkTestMode" Style="{StaticResource AutoCheckBox}"
+                      Checked="ChkTestMode_Changed" Unchecked="ChkTestMode_Changed"/>
+            <TextBlock x:Name="TxtTestModeHint" Style="{StaticResource FieldHint}"/>
+
             <!-- UA: Перемикач повністю ручного режиму — вимикає будь-яку
                      підстановку шаблону, відправляється рівно те, що введено
                      в полях нижче, окремо для кожної платформи
@@ -268,20 +281,18 @@
             <TextBlock x:Name="TxtRawModeHint" Style="{StaticResource FieldHint}"/>
 
             <!-- UA: Вибір Discord-каналу. Увесь блок існує лише якщо в
-                     налаштуваннях заведено більше одного каналу — якщо канал
-                     лише один, вікно виглядає точно як раніше, тобто наявним
-                     користувачам нічого не додається "просто так".
-                     Типово надсилаємо в основний канал: галочка потрібна саме
-                     щоб змінити канал була свідома дія, а не випадковий клік
-                     по списку, який відправить анонс не туди. Список
-                     з'являється тільки після зняття цієї галочки.
+                     налаштуваннях заведено більше одного каналу — з єдиним
+                     каналом блок не показується.
+                     Типово відправка йде в основний канал: галочка потрібна,
+                     щоб зміна каналу була свідомою дією, а не випадковим
+                     кліком по списку, який відправить анонс не туди. Список
+                     з'являється тільки після встановлення цієї галочки.
                      Блок спільний для обох режимів (шаблонного і ручного) —
                      стоїть до їх розділення, бо канал це властивість
                      відправки, а не режиму
                  EN: Discord channel picker. The whole block only exists when
                      more than one channel is configured — with a single channel
-                     the window looks exactly as before, i.e. nothing is added
-                     "just because" for existing users.
+                     the block isn't shown.
                      The primary channel is the default: the checkbox exists so
                      that changing the channel is a deliberate act, not a stray
                      click in a list that sends the announcement to the wrong
@@ -346,17 +357,17 @@
 
             <!-- UA: Банер статусу завантаження списку з YouTube. Свідомо ЗЗОВНІ
                      PanelPickerRow: той рядок ховається, коли автопідбір
-                     увімкнено, і повідомлення про помилку разом з ним ставало
+                     увімкнено, і повідомлення про помилку разом з ним було б
                      невидимим саме в найпоширенішому сценарії — вікно виглядало
-                     просто порожнім, без жодного пояснення чому.
+                     б порожнім, без жодного пояснення чому.
                      Кольори фону/рамки й іконка призначаються з code-behind
                      (нейтральні для "завантаження", жовті для "показано з кешу",
                      червоні для повного провалу) — щоб не плодити три майже
                      однакові розмітки під кожен стан.
                  EN: YouTube list loading status banner. Deliberately OUTSIDE
                      PanelPickerRow: that row is hidden while auto-pick is on, so
-                     the error message used to become invisible in exactly the
-                     most common scenario — the window just looked empty with no
+                     the error message would be invisible in exactly the most
+                     common scenario — the window would just look empty with no
                      explanation why.
                      Background/border colors and the icon are assigned from
                      code-behind (neutral for "loading", amber for "served from
@@ -456,10 +467,10 @@
             <TextBlock x:Name="TxtUrlHint" Style="{StaticResource FieldHint}"/>
             <TextBlock x:Name="TxtUrlWarning" Style="{StaticResource WarningHint}" Visibility="Collapsed"/>
 
-            <!-- UA: Поля дати/часу тепер завжди видимі — підпис змінюється
+            <!-- UA: Поля дати/часу завжди видимі — підпис змінюється
                      залежно від типу (обов'язкові для Upcoming, довідкові
                      для решти)
-                 EN: Date/time fields are now always visible — the label
+                 EN: Date/time fields are always visible — the label
                      changes depending on type (required for Upcoming,
                      informational for the rest) -->
             <TextBlock x:Name="TxtDateLabel" Style="{StaticResource FieldLabel}"/>
@@ -775,6 +786,8 @@
             <StackPanel x:Name="PanelSendStatus" Visibility="Collapsed" Margin="0,16,0,0">
                 <TextBlock x:Name="TxtSendStatusTelegram" Style="{StaticResource FieldHint}" FontSize="14"/>
                 <TextBlock x:Name="TxtSendStatusDiscord" Style="{StaticResource FieldHint}" FontSize="14"/>
+                <TextBlock x:Name="TxtSendStatusSource" Style="{StaticResource FieldHint}" FontSize="13"
+                           Visibility="Collapsed"/>
             </StackPanel>
 
             <Button x:Name="BtnSend"

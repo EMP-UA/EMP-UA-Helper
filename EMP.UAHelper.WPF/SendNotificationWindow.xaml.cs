@@ -23,7 +23,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 // UA: Проєкт одночасно підключає WPF і WinForms (для іконки в треї) — тому
 //     TextBox/Button існують в обох просторах імен і компілятор не може сам
-//     вибрати, який мається на увазі. Явно фіксуємо WPF-варіант, як і в
+//     вибрати, який мається на увазі. Використовується WPF-варіант, як і в
 //     SettingsWindow.xaml.cs/FirstRunWindow.xaml.cs.
 // EN: The project references both WPF and WinForms (for the tray icon), so
 //     TextBox/Button exist in both namespaces and the compiler can't pick one
@@ -35,7 +35,7 @@ using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
 // UA: Той самий конфлікт WPF/WinForms, що описаний вище — OpenFileDialog
 //     також існує в обох просторах імен (System.Windows.Forms і
-//     Microsoft.Win32). Явно фіксуємо WPF-варіант.
+//     Microsoft.Win32). Використовується WPF-варіант.
 // EN: The same WPF/WinForms conflict described above — OpenFileDialog also
 //     exists in both namespaces (System.Windows.Forms and Microsoft.Win32).
 //     Pin the WPF variant explicitly.
@@ -56,7 +56,7 @@ namespace EMP.UAHelper.WPF
 
         // UA: Список каналів Discord, що зараз стоїть у ChannelCombo — сам
         //     ComboBox прив'язаний лише до назв (рядків), тож саме тут
-        //     тримаємо відповідність "індекс у списку -> реальний URL".
+        //     зберігається відповідність "індекс у списку -> реальний URL".
         //     Детальніше — коментар у BuildChannelList().
         // EN: The list of Discord channels currently in ChannelCombo — the
         //     ComboBox itself is bound only to the names (strings), so this
@@ -76,12 +76,12 @@ namespace EMP.UAHelper.WPF
         //     спільні для Telegram і Discord (одна галерея, обидві
         //     платформи). Шляхи, не байти: файл читається лише в момент
         //     фактичної відправки (DiscordService/TelegramService), тут
-        //     тримаємо мінімум пам'яті — самі лише рядки-шляхи
+        //     зберігаються лише рядки-шляхи
         // EN: Local image files attached in manual mode — shared by
         //     Telegram and Discord (one gallery, both platforms). Paths, not
         //     bytes: the file is only read at actual send time
-        //     (DiscordService/TelegramService), here we keep the minimum —
-        //     just the path strings
+        //     (DiscordService/TelegramService), only the path
+        //     strings are stored here
         private readonly List<string> _attachedImagePaths = new();
 
         // UA: Яке текстове поле зараз "слухає" спільний піквер дати/часу —
@@ -106,6 +106,18 @@ namespace EMP.UAHelper.WPF
         //     has been made yet in this window.
         private SendResult? _lastSendResult;
         private string? _lastSendSignature;
+
+        // UA: Звідки отримано список відео для шаблонного режиму, якщо це
+        //     не звичайний RSS: "api" — запасний шлях через YouTube Data API,
+        //     "cache" — лише локальний кеш (YouTube недоступний). null —
+        //     звичайний RSS. Потрапляє у статус і вікно результату відправки,
+        //     щоб обхідний шлях було видно в підсумку.
+        // EN: Where the video list for template mode came from, if not the
+        //     regular RSS: "api" — the YouTube Data API fallback path,
+        //     "cache" — only the local cache (YouTube unavailable). null —
+        //     the regular RSS. It goes into the send status and the result
+        //     window, so a workaround path is visible in the summary.
+        private string? _dataSource;
 
         // UA: Результат останньої перевірки з'єднання (GetMe/GetChat для
         //     Telegram, GET вебхука для Discord) — читається з
@@ -147,7 +159,7 @@ namespace EMP.UAHelper.WPF
 
             ApplyLocalization();
 
-            // UA: Показуємо блоки прикладу лише для реально увімкнених платформ —
+            // UA: Блоки прикладу показуються лише для реально увімкнених платформ —
             //     стан платформ не змінюється, поки це вікно відкрите, тож
             //     достатньо встановити один раз тут
             // EN: Show preview blocks only for actually enabled platforms —
@@ -239,9 +251,12 @@ namespace EMP.UAHelper.WPF
             //     RunConnectionCheckAsync.
             if (_connChecked)
             {
-                SetConnectionLine(TxtConnTelegram, "Telegram", _lastConnResult?.Telegram);
-                SetConnectionLine(TxtConnDiscord, "Discord", _lastConnResult?.Discord);
+                SetConnectionLine(TxtConnTelegram, TelegramLabel, _lastConnResult?.Telegram);
+                SetConnectionLine(TxtConnDiscord, DiscordLabel, _lastConnResult?.Discord);
             }
+
+            ChkTestMode.Content = _loc.Get("send.test.toggle");
+            UpdateTestModeState();
 
             ChkRawMode.Content = _loc.Get("send.raw.toggle");
             TxtRawModeHint.Text = _loc.Get("send.raw.hint");
@@ -567,7 +582,7 @@ namespace EMP.UAHelper.WPF
                 });
             }
 
-            // UA: Записи без URL пропускаємо — порожній рядок у налаштуваннях
+            // UA: Записи без URL пропускаються — порожній рядок у налаштуваннях
             //     не має ставати пунктом списку, який мовчки нікуди не надішле
             // EN: Entries without a URL are skipped — an empty row in settings
             //     shouldn't become a list item that silently sends nowhere
@@ -595,7 +610,7 @@ namespace EMP.UAHelper.WPF
 
             _channels = channels;
 
-            // UA: ComboBox прив'язуємо до самих назв (List<string>), а не до
+            // UA: ComboBox прив'язується до самих назв (List<string>), а не до
             //     об'єктів DiscordWebhookTarget напряму. Причина: кастомний
             //     ControlTemplate у Styles/DarkComboBox.xaml (ComboField) не
             //     синхронізує DisplayMemberPath із закритим станом
@@ -623,7 +638,7 @@ namespace EMP.UAHelper.WPF
                 if (match >= 0) ChannelCombo.SelectedIndex = match;
             }
 
-            // UA: Один канал — вибирати нема з чого, блок не показуємо взагалі
+            // UA: Один канал — вибирати нема з чого, блок не показується
             // EN: One channel — there's nothing to choose, don't show the block
             PanelChannelPicker.Visibility = channels.Count > 1
                 ? Visibility.Visible
@@ -637,8 +652,8 @@ namespace EMP.UAHelper.WPF
             bool custom = ChkOverrideChannel.IsChecked == true;
             ChannelCombo.Visibility = custom ? Visibility.Visible : Visibility.Collapsed;
 
-            // UA: Знімаючи галочку, повертаємось саме на основний канал, а не
-            //     лишаємо останній обраний — інакше "вимкнув перевизначення",
+            // UA: Після зняття галочки вибирається саме основний канал, а не
+            //     лишається останній обраний — інакше "вимкнув перевизначення",
             //     а надсилає все одно кудись убік
             // EN: Unticking returns to the primary channel rather than keeping
             //     the last selection — otherwise "override off" would still
@@ -660,17 +675,96 @@ namespace EMP.UAHelper.WPF
             //     а додаткові канали заведені. Повернути тут null означало б
             //     віддати сервісу порожній URL — той просто нічого не надішле,
             //     і людина побачить "надіслано" без жодного повідомлення в
-            //     Discord. Тому підставляємо перший доступний канал.
+            //     Discord. Тому підставляється перший доступний канал.
             // EN: A degenerate but entirely possible case: the primary webhook
             //     is empty (e.g. hand-deleted from appsettings.json) while
             //     additional channels are configured. Returning null here would
             //     hand the service an empty URL — it would simply send nothing,
             //     and the person would see "sent" with no Discord message at
-            //     all. So we fall back to the first available channel.
+            //     all. So the first available channel is used.
             if (string.IsNullOrWhiteSpace(_settings.DiscordWebhookUrl))
                 return SelectedChannelUrl();
 
             return null;
+        }
+
+        // =====================================================================
+        // UA: Тестова відправка. Цілі беруться з налаштувань
+        //     (TelegramTestChatId / DiscordTestWebhookUrl). Платформа без
+        //     тестової цілі в тестовому режимі не надсилається взагалі —
+        //     повернення до основного каналу навмисно немає, щоб тест ніколи
+        //     не потрапив підписникам.
+        // EN: Test send. Targets come from settings
+        //     (TelegramTestChatId / DiscordTestWebhookUrl). A platform without
+        //     a test target isn't sent to at all in test mode — falling back to
+        //     the main channel is deliberately absent, so a test never reaches
+        //     subscribers.
+        // =====================================================================
+        private bool IsTestMode => ChkTestMode?.IsChecked == true;
+
+        private string TestChatId => _settings.TelegramTestChatId?.Trim() ?? string.Empty;
+        private string TestWebhookUrl => _settings.DiscordTestWebhookUrl?.Trim() ?? string.Empty;
+
+        private bool HasTelegramTestTarget => _settings.UseTelegram && TestChatId.Length > 0;
+        private bool HasDiscordTestTarget => _settings.UseDiscord && TestWebhookUrl.Length > 0;
+
+        private string TelegramLabel => IsTestMode ? "Telegram 🧪" : "Telegram";
+        private string DiscordLabel => IsTestMode ? "Discord 🧪" : "Discord";
+
+        // UA: Ціль Discord для поточної відправки з урахуванням тестового режиму
+        // EN: The Discord target for the current send, test mode included
+        private string? EffectiveWebhookUrl() => IsTestMode ? TestWebhookUrl : SelectedWebhookUrl();
+
+        // UA: Ціль Telegram: null — канал із налаштувань
+        // EN: The Telegram target: null means the channel from settings
+        private string? EffectiveTelegramChatId() => IsTestMode ? TestChatId : null;
+
+        private void ChkTestMode_Changed(object sender, RoutedEventArgs e)
+        {
+            if (TxtTestModeHint == null) return;
+
+            UpdateTestModeState();
+            PanelSendStatus.Visibility = Visibility.Collapsed;
+            _ = RunConnectionCheckAsync();
+        }
+
+        // UA: Підказка під галочкою показує, куди саме піде тест; без жодної
+        //     тестової цілі галочка недоступна. Вибір каналу Discord у
+        //     тестовому режимі вимикається — ціль одна, тестова
+        // EN: The hint under the checkbox shows exactly where the test goes;
+        //     with no test target at all the checkbox is disabled. The Discord
+        //     channel picker is disabled in test mode — there's a single
+        //     target, the test one
+        private void UpdateTestModeState()
+        {
+            if (TxtTestModeHint == null) return;
+
+            var anyTarget = HasTelegramTestTarget || HasDiscordTestTarget;
+            ChkTestMode.IsEnabled = anyTarget;
+            if (!anyTarget && ChkTestMode.IsChecked == true)
+                ChkTestMode.IsChecked = false;
+
+            if (!anyTarget)
+            {
+                TxtTestModeHint.Text = _loc.Get("send.test.not_configured");
+            }
+            else
+            {
+                var telegram = !_settings.UseTelegram
+                    ? null
+                    : HasTelegramTestTarget
+                        ? string.Format(_loc.Get("send.test.target.telegram"), TestChatId)
+                        : _loc.Get("send.test.target.telegram_none");
+                var discord = !_settings.UseDiscord
+                    ? null
+                    : HasDiscordTestTarget
+                        ? _loc.Get("send.test.target.discord")
+                        : _loc.Get("send.test.target.discord_none");
+
+                TxtTestModeHint.Text = string.Join("\n", new[] { telegram, discord }.Where(s => s != null));
+            }
+
+            PanelChannelPicker.IsEnabled = !IsTestMode;
         }
 
         // UA: ChannelCombo зберігає лише назви (рядки) — див. коментар у
@@ -765,7 +859,7 @@ namespace EMP.UAHelper.WPF
                     bitmap.BeginInit();
                     bitmap.UriSource = new Uri(path, UriKind.Absolute);
                     // UA: Локальні файли можуть бути значно більшими за
-                    //     будь-яке YouTube-прев'ю — обмежуємо декодований
+                    //     будь-яке YouTube-прев'ю — обмежується декодований
                     //     розмір, щоб мініатюра не з'їдала пам'ять і диск
                     //     повністю на кожен скріншот у галереї
                     // EN: Local files can be far larger than any YouTube
@@ -786,8 +880,8 @@ namespace EMP.UAHelper.WPF
                 }
                 catch
                 {
-                    // UA: Файл видалили/пошкодили між вибором і рендером —
-                    //     показуємо позначку замість падіння вікна
+                    // UA: Файл видалено/пошкоджено між вибором і рендером —
+                    //     показується позначка замість падіння вікна
                     // EN: The file was removed/corrupted between selection and
                     //     render — show a marker instead of crashing the window
                     border.Child = new TextBlock
@@ -968,21 +1062,14 @@ namespace EMP.UAHelper.WPF
         //     and the click — silently do nothing, the thumbnail already
         //     shows a ⚠ marker for that case
         //
-        //     UA: Раніше зображення примусово стискалось до MaxWidth=900/
-        //     MaxHeight=700 — на моніторах з меншою роздільною здатністю, ніж
-        //     оригінал (напр. 1080p), це давало помітно зменшену картинку з
-        //     рамками по боках і без жодного способу роздивитись деталі.
-        //     Тепер зображення показується в оригінальному розмірі (Stretch
+        //     UA: Зображення показується в оригінальному розмірі (Stretch
         //     .None) всередині ScrollViewer, вікно підлаштовується під розмір
         //     картинки, але не більше ~92% робочої area екрана. Масштаб
         //     керується Ctrl+колесо миші (як у браузерах) або кнопками
         //     ➖ / 100% / ➕ зверху — для зображень, більших за екран, чи
         //     навпаки, щоб роздивитись дрібні деталі ближче.
-        //     EN: Previously the image was forced down to MaxWidth=900/
-        //     MaxHeight=700 — on monitors with a lower resolution than the
-        //     original (e.g. 1080p), this produced a visibly shrunk image
-        //     with side bars and no way to inspect detail. The image is now
-        //     shown at its native size (Stretch.None) inside a ScrollViewer;
+        //     EN: The image is shown at its native size (Stretch.None) inside
+        //     a ScrollViewer;
         //     the window sizes itself to the image but caps at ~92% of the
         //     screen's work area. Zoom is controlled via Ctrl+mouse wheel
         //     (the same gesture browsers use) or the ➖ / 100% / ➕ buttons
@@ -1203,14 +1290,14 @@ namespace EMP.UAHelper.WPF
         //     тексту, або, якщо нічого не виділено, вставляє пару
         //     тегів/символів на місці курсора й ставить курсор МІЖ ними, щоб
         //     одразу можна було друкувати. Жодної магії з парсингом —
-        //     користувач і далі бачить і редагує сирий текст з тегами, так
-        //     само, як і раніше під час ручного набору.
+        //     в полі лишається сирий текст з тегами, який можна редагувати
+        //     як і при ручному наборі.
         // EN: A formatting toolbar — a button applies the markup to the
         //     SELECTED text, or, if nothing is selected, inserts the pair
         //     of tags/symbols at the caret and places the caret BETWEEN
         //     them so typing can continue right away. No parsing magic —
-        //     the user still sees and edits the raw
-        //     tagged text, exactly as when typing it by hand before.
+        //     the field keeps the raw tagged text, editable just like when
+        //     typing by hand.
         // =====================================================================
         private void FormatTelegram_Click(object sender, RoutedEventArgs e)
         {
@@ -1279,10 +1366,10 @@ namespace EMP.UAHelper.WPF
             }
             else
             {
-                // UA: Було виділено текст — виділення лишається (тепер
-                //     разом з тегами видно весь результат одразу)
+                // UA: Був виділений текст — виділення лишається
+                //     (разом з тегами видно весь результат одразу)
                 // EN: Text was selected — keep it selected (the whole result,
-                //     tags included, is now visible at once)
+                //     tags included, stays visible)
                 target.SelectionStart = start + prefix.Length;
                 target.SelectionLength = length;
             }
@@ -1305,11 +1392,11 @@ namespace EMP.UAHelper.WPF
             SetCharCount(TxtDiscordCharCount, RawDiscordInput.Text.Length, DiscordContentLimit);
         }
 
-        // UA: Червоний (не жовтий) навмисно — перевищення тут більше не
+        // UA: Червоний (не жовтий) навмисно — перевищення тут — не
         //     просто попередження, а реальна причина, через яку CheckCharLimits
         //     заблокує відправку на цю платформу
-        // EN: Red (not yellow) on purpose — exceeding the limit here is no
-        //     longer just a warning, it's the real reason CheckCharLimits
+        // EN: Red (not yellow) on purpose — exceeding the limit here is not
+        //     just a warning, it's the real reason CheckCharLimits
         //     will block sending to this platform
         private static void SetCharCount(TextBlock target, int length, int limit)
         {
@@ -1340,10 +1427,10 @@ namespace EMP.UAHelper.WPF
 
             try
             {
-                // UA: Помилка мережі більше не знищує список — сервіс поверне
+                // UA: Помилка мережі не знищує список — сервіс поверне
                 //     те, що є в локальному кеші, і окремо повідомить, що
                 //     онлайн-оновитись не вдалося
-                // EN: A network error no longer wipes the list — the service
+                // EN: A network error doesn't wipe the list — the service
                 //     returns whatever is in the local cache and separately
                 //     reports that the online refresh failed
                 var (candidates, fetchError) = await _youTubeService.GetCandidatesWithStatusAsync();
@@ -1351,9 +1438,14 @@ namespace EMP.UAHelper.WPF
                 BuildCandidateItems();
 
                 if (fetchError != null)
+                {
                     await ReportLoadFailureAsync(fetchError);
+                }
                 else
+                {
+                    _dataSource = null;
                     HideStatus();
+                }
 
                 if (ChkAutoLatest.IsChecked == true)
                     AutoFillBestPick();
@@ -1398,6 +1490,7 @@ namespace EMP.UAHelper.WPF
                 error);
 
             bool hasCache = _candidates.Count > 0;
+            _dataSource = hasCache ? "cache" : null;
 
             ShowStatus(
                 icon: hasCache ? "⚠" : "⛔",
@@ -1561,6 +1654,8 @@ namespace EMP.UAHelper.WPF
                 }
                 else
                 {
+                    _dataSource = "api";
+
                     // UA: Список свіжий, але отриманий платним шляхом — кажемо
                     //     про це прямо, щоб витрата квоти не була невидимою
                     // EN: The list is fresh but came via the paid path — say so
@@ -1816,18 +1911,17 @@ namespace EMP.UAHelper.WPF
             {
                 // UA: Офіційного способу отримати превью Twitch-каналу без
                 //     авторизації через Twitch API не існує (Helix API
-                //     вимагає App Access Token). Перевірене на практиці
-                //     неофіційне джерело (static-cdn.jtvnw.net) виявилось
-                //     нестабільним/недоступним — тому прев'ю тут свідомо
-                //     не показуємо, лише розпізнаємо посилання як коректне
-                //     (знімаємо м'яке попередження про "непізнаний URL")
+                //     вимагає App Access Token). Неофіційне джерело
+                //     (static-cdn.jtvnw.net) нестабільне/недоступне — тому
+                //     прев'ю тут свідомо не показується, посилання лише
+                //     розпізнається як коректне
+                //     (м'яке попередження про "непізнаний URL" знімається)
                 // EN: There's no official way to get a Twitch channel
                 //     thumbnail without Twitch API authorization (the Helix
                 //     API requires an App Access Token). The unofficial
-                //     source (static-cdn.jtvnw.net) tested in practice turned
-                //     out unreliable/unavailable — so we deliberately don't
-                //     show a thumbnail here, we just recognize the link as
-                //     valid (clearing the "unrecognized URL" soft warning)
+                //     source (static-cdn.jtvnw.net) is unreliable/unavailable —
+                //     so no thumbnail is shown here on purpose, the link is
+                //     just recognized as valid (clearing the "unrecognized URL" soft warning)
                 SetThumbnail(null, isTwitch: false);
                 UpdatePreview();
                 return;
@@ -1877,7 +1971,7 @@ namespace EMP.UAHelper.WPF
 
         // UA: Встановити мініатюру безпечно — якщо посилання виявиться
         //     нечинним (особливо ймовірно для неофіційного Twitch-URL),
-        //     просто ховаємо картинку без помилки
+        //     картинка ховається без помилки
         // EN: Set the thumbnail safely — if the link turns out to be invalid
         //     (especially likely for the unofficial Twitch URL), just hide
         //     the image without an error
@@ -1974,11 +2068,11 @@ namespace EMP.UAHelper.WPF
         }
 
         // UA: Часова зона береться з поточних налаштувань через AppTimeZone —
-        //     нічого не хардкодиться (раніше тут напряму стояло "FLE Standard
-        //     Time"). Тому методи більше не static — їм потрібен доступ до _settings
+        //     нічого не хардкодиться. Тому методи не static — їм потрібен
+        //     доступ до _settings
         // EN: The timezone comes from the current settings via AppTimeZone —
-        //     nothing is hardcoded here (this used to have "FLE Standard Time"
-        //     inline). That's why these are no longer static — they need access to _settings
+        //     nothing is hardcoded here. That's why these aren't static —
+        //     they need access to _settings
         private (string date, string time) FormatLocalTime(long unixSeconds)
         {
             var timeZone = AppTimeZone.Resolve(_settings.TimeZoneId);
@@ -2164,7 +2258,7 @@ namespace EMP.UAHelper.WPF
 
             var url = UrlInput.Text.Trim();
 
-            // UA: Розпізнаємо YouTube ID з поточного URL, щоб Discord-embed
+            // UA: YouTube ID розпізнається з поточного URL, щоб Discord-embed
             //     отримав картинку — Discord, на відміну від Telegram, не тягне
             //     прев'ю сам за посиланням, а бере його явно з ThumbnailUrl,
             //     який будується саме з VideoId
@@ -2183,28 +2277,36 @@ namespace EMP.UAHelper.WPF
                 UrlOverride = string.IsNullOrWhiteSpace(url) ? null : url
             };
 
-            var webhookUrl = SelectedWebhookUrl();
-            var signature = ComputeSignature("template", title, type, scheduled, url, webhookUrl);
-            var (sendTelegram, sendDiscord) = ResolveResendScope(
-                signature, _settings.UseTelegram, _settings.UseDiscord);
+            var isTest = IsTestMode;
+            var webhookUrl = EffectiveWebhookUrl();
+            var telegramChatId = EffectiveTelegramChatId();
+            var signature = ComputeSignature(isTest ? "template-test" : "template", title, type, scheduled, url, webhookUrl);
 
-            // UA: Користувач відмовився повторно надсилати туди, де вже й так
-            //     підтверджено успіх, і нічого іншого надсилати не було
-            //     заплановано — немає що робити
-            // EN: The person declined to resend where success was already
-            //     confirmed, and nothing else was scheduled to send — nothing
-            //     left to do
+            // UA: Тестова відправка не проходить захист від дублів — повтор
+            //     тесту в особистий/тестовий чат нікому не заважає
+            // EN: A test send bypasses duplicate protection — repeating a test
+            //     into a private/test chat bothers nobody
+            var (sendTelegram, sendDiscord) = isTest
+                ? (HasTelegramTestTarget, HasDiscordTestTarget)
+                : ResolveResendScope(signature, _settings.UseTelegram, _settings.UseDiscord);
+
+            // UA: Повторну відправку відхилено там, де успіх уже підтверджено,
+            //     і більше нічого надсилати — вихід
+            // EN: Resending was declined where success is already confirmed,
+            //     and there's nothing else to send — return
             if (!sendTelegram && !sendDiscord) return;
 
-            PanelSendStatus.Visibility = Visibility.Collapsed;
             BtnSend.IsEnabled = false;
+            ShowSending(sendTelegram, sendDiscord);
             try
             {
-                var result = await _dispatcher.SendAsync(video, webhookUrl, sendTelegram, sendDiscord);
+                var result = await _dispatcher.SendAsync(video, webhookUrl, sendTelegram, sendDiscord,
+                    telegramChatId, isTest);
                 result = MergeSkippedPlatforms(signature, result);
                 _lastSendResult = result;
                 _lastSendSignature = signature;
                 ShowSendResult(result);
+                ShowResultDialogIfNeeded(result, isTest);
 
                 // UA: Вікно закривається лише якщо дійсно все, що мало піти,
                 //     пішло — часткова невдача мусить лишатись на екрані,
@@ -2213,8 +2315,9 @@ namespace EMP.UAHelper.WPF
                 // EN: Only close the window if everything that was supposed
                 //     to go out actually went out — a partial failure must
                 //     stay on screen so the person sees it here, not find
-                //     out from Telegram/Discord afterward
-                if (result.AllAttemptsSucceeded)
+                //     out from Telegram/Discord afterward. After a test send the
+                //     window stays open — the real send usually follows
+                if (result.AllAttemptsSucceeded && !isTest)
                     Close();
             }
             finally
@@ -2242,31 +2345,45 @@ namespace EMP.UAHelper.WPF
                 return;
             }
 
-            var wantTelegram = !string.IsNullOrWhiteSpace(telegramText);
-            var wantDiscord = !string.IsNullOrWhiteSpace(discordText);
+            var isTest = IsTestMode;
+            var wantTelegram = !string.IsNullOrWhiteSpace(telegramText) && (!isTest || HasTelegramTestTarget);
+            var wantDiscord = !string.IsNullOrWhiteSpace(discordText) && (!isTest || HasDiscordTestTarget);
+
+            if (isTest && !wantTelegram && !wantDiscord)
+            {
+                System.Windows.MessageBox.Show(
+                    _loc.Get("send.test.nothing_to_send"), _loc.Get("app.name"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
             (wantTelegram, wantDiscord) = CheckCharLimits(
                 telegramText, discordText, _attachedImagePaths.Count > 0, wantTelegram, wantDiscord);
             if (!wantTelegram && !wantDiscord) return;
 
-            var webhookUrl = SelectedWebhookUrl();
-            var signature = ComputeSignature("raw", telegramText, discordText, webhookUrl, _attachedImagePaths);
-            var (sendTelegram, sendDiscord) = ResolveResendScope(signature, wantTelegram, wantDiscord);
+            var webhookUrl = EffectiveWebhookUrl();
+            var telegramChatId = EffectiveTelegramChatId();
+            var signature = ComputeSignature(isTest ? "raw-test" : "raw", telegramText, discordText, webhookUrl, _attachedImagePaths);
+            var (sendTelegram, sendDiscord) = isTest
+                ? (wantTelegram, wantDiscord)
+                : ResolveResendScope(signature, wantTelegram, wantDiscord);
 
             if (!sendTelegram && !sendDiscord) return;
 
-            PanelSendStatus.Visibility = Visibility.Collapsed;
             BtnSend.IsEnabled = false;
+            ShowSending(sendTelegram, sendDiscord);
             try
             {
                 var result = await _dispatcher.SendRawAsync(
-                    telegramText, discordText, webhookUrl, _attachedImagePaths, sendTelegram, sendDiscord);
+                    telegramText, discordText, webhookUrl, _attachedImagePaths, sendTelegram, sendDiscord,
+                    telegramChatId, isTest);
                 result = MergeSkippedPlatforms(signature, result);
                 _lastSendResult = result;
                 _lastSendSignature = signature;
                 ShowSendResult(result);
+                ShowResultDialogIfNeeded(result, isTest);
 
-                if (result.AllAttemptsSucceeded)
+                if (result.AllAttemptsSucceeded && !isTest)
                     Close();
             }
             finally
@@ -2412,11 +2529,110 @@ namespace EMP.UAHelper.WPF
         {
             PanelSendStatus.Visibility = Visibility.Visible;
 
+            var source = SourceNoteText();
+            TxtSendStatusSource.Text = source == null ? string.Empty : $"ℹ {source}";
+            TxtSendStatusSource.Visibility = source == null ? Visibility.Collapsed : Visibility.Visible;
+
             TxtSendStatusTelegram.Visibility = _settings.UseTelegram ? Visibility.Visible : Visibility.Collapsed;
             TxtSendStatusDiscord.Visibility = _settings.UseDiscord ? Visibility.Visible : Visibility.Collapsed;
 
-            SetStatusLine(TxtSendStatusTelegram, "Telegram", result.Telegram);
-            SetStatusLine(TxtSendStatusDiscord, "Discord", result.Discord);
+            SetStatusLine(TxtSendStatusTelegram, TelegramLabel, result.Telegram);
+            SetStatusLine(TxtSendStatusDiscord, DiscordLabel, result.Discord);
+        }
+
+ // UA: Окреме вікно з результатом відправки — за налаштуванням
+        //     "SendResultDialog": завжди, лише при помилці або ніколи. У вікні
+        //     картка на кожну платформу, що брала участь у відправці; текст
+        //     помилки обрізається. Показується ДО закриття головного вікна й
+        //     прив'язане до нього, тож повторно натиснути "Надіслати" під
+        //     час діалогу неможливо.
+        // EN: A separate send-result window — per the "SendResultDialog"
+        //     setting: always, only on failure, or never. It has one card per
+        //     platform that took part in the send; the error text is
+        //     truncated. It is shown BEFORE the main window closes and is
+        //     owned by it, so "Send" can't be pressed again while it is open.
+        private void ShowResultDialogIfNeeded(SendResult result, bool isTest)
+        {
+            var mode = SendResultDialogMode.Normalize(_settings.SendResultDialog);
+            var allOk = result.AllAttemptsSucceeded;
+
+            if (mode == SendResultDialogMode.Never) return;
+            if (mode == SendResultDialogMode.Failures && allOk) return;
+            if (!result.Telegram.Attempted && !result.Discord.Attempted) return;
+
+            var rows = new List<SendResultRow>();
+            if (result.Telegram.Attempted) rows.Add(BuildResultRow(TelegramLabel, result.Telegram));
+            if (result.Discord.Attempted) rows.Add(BuildResultRow(DiscordLabel, result.Discord));
+
+            var dialog = new SendResultWindow(
+                this,
+                _loc.Get("send.result.title"),
+                _loc.Get(allOk ? "send.result.header_ok" : "send.result.header_failed"),
+                allOk,
+                rows,
+                SourceNoteText(),
+                _loc.Get("send.result.ok_button"));
+            dialog.ShowDialog();
+        }
+
+        // UA: Рядок вікна результату: статус, примітка про обхідний шлях (або
+        //     текст помилки) та ID повідомлення, що повернула платформа
+        // EN: A result-window row: the status, a workaround note (or the
+        //     error text) and the message ID returned by the platform
+        private SendResultRow BuildResultRow(string platformLabel, PlatformSendResult r)
+        {
+            if (r.Succeeded)
+            {
+                var note = NoteText(r);
+                var id = string.IsNullOrEmpty(r.ConfirmationId)
+                    ? null
+                    : string.Format(_loc.Get("send.result.id"), r.ConfirmationId);
+                return new SendResultRow(platformLabel, _loc.Get("send.status.ok"), true, note, id);
+            }
+
+            const int maxErrorLength = 400;
+            var error = r.Error?.Message ?? string.Empty;
+            if (error.Length > maxErrorLength) error = error[..maxErrorLength] + "…";
+
+            return new SendResultRow(platformLabel, _loc.Get("send.status.failed"), false, error, null);
+        }
+
+        // UA: Примітка про обхідне джерело списку відео — лише в шаблонному
+        //     режимі (ручний режим список не використовує) і лише якщо це не
+        //     звичайний RSS
+        // EN: A note about a workaround video-list source — template mode only
+        //     (manual mode doesn't use the list) and only if it isn't the
+        //     regular RSS
+        private string? SourceNoteText()
+        {
+            if (ChkRawMode.IsChecked == true) return null;
+
+            return _dataSource switch
+            {
+                "api" => _loc.Get("send.source.api"),
+                "cache" => _loc.Get("send.source.cache"),
+                _ => null
+            };
+        }
+
+        // UA: Проміжний стан "надсилається…" для платформ поточної спроби —
+        //     кнопка "Надіслати" на час відправки неактивна, і без цього
+        //     рядка вікно виглядає зависшим
+        // EN: An interim "sending…" state for the platforms of the current
+        //     attempt — the "Send" button is disabled while sending, and
+        //     without this line the window looks frozen
+        private void ShowSending(bool telegram, bool discord)
+        {
+            PanelSendStatus.Visibility = Visibility.Visible;
+            TxtSendStatusSource.Visibility = Visibility.Collapsed;
+
+            TxtSendStatusTelegram.Visibility = telegram ? Visibility.Visible : Visibility.Collapsed;
+            TxtSendStatusDiscord.Visibility = discord ? Visibility.Visible : Visibility.Collapsed;
+
+            TxtSendStatusTelegram.Text = $"{TelegramLabel}: {_loc.Get("send.status.sending")}";
+            TxtSendStatusDiscord.Text = $"{DiscordLabel}: {_loc.Get("send.status.sending")}";
+            TxtSendStatusTelegram.Foreground = Brush("#B8A8D0");
+            TxtSendStatusDiscord.Foreground = Brush("#B8A8D0");
         }
 
         private void SetStatusLine(TextBlock target, string platformLabel, PlatformSendResult r)
@@ -2430,7 +2646,7 @@ namespace EMP.UAHelper.WPF
 
             if (r.Succeeded)
             {
-                target.Text = $"{platformLabel}: {_loc.Get("send.status.ok")}";
+                target.Text = $"{platformLabel}: {_loc.Get("send.status.ok")}" + NoteSuffix(r, "\n   ");
                 target.Foreground = Brush("#55C57A");
             }
             else
@@ -2438,6 +2654,26 @@ namespace EMP.UAHelper.WPF
                 target.Text = $"{platformLabel}: {_loc.Get("send.status.failed")} — {r.Error?.Message}";
                 target.Foreground = Brush("#E0605A");
             }
+        }
+
+        // UA: Примітка до успішної відправки (напр. фото замість прев'ю) —
+        //     лише та мовна частина, що відповідає поточній мові інтерфейсу
+        // EN: A note for a successful send (e.g. a photo instead of a
+        //     preview) — only the part matching the current UI language
+        private string NoteSuffix(PlatformSendResult r, string separator)
+        {
+            var text = NoteText(r);
+            return text == null ? string.Empty : $"{separator}ℹ {text}";
+        }
+
+        // UA: Текст примітки мовою інтерфейсу (null, якщо примітки немає)
+        // EN: The note text in the UI language (null if there is no note)
+        private string? NoteText(PlatformSendResult r)
+        {
+            if (string.IsNullOrEmpty(r.Note)) return null;
+
+            var parts = r.Note.Split(" / ", 2);
+            return parts.Length == 2 ? (_loc.Language == UiLanguage.UA ? parts[0] : parts[1]) : r.Note;
         }
 
         // UA: Перевірка з'єднання з увімкненими платформами — ДО фактичної
@@ -2471,25 +2707,29 @@ namespace EMP.UAHelper.WPF
 
             if (_settings.UseTelegram)
             {
-                TxtConnTelegram.Text = $"Telegram: {_loc.Get("send.conn.checking")}";
+                TxtConnTelegram.Text = $"{TelegramLabel}: {_loc.Get("send.conn.checking")}";
                 TxtConnTelegram.Foreground = Brush("#B8A8D0");
             }
 
             if (_settings.UseDiscord)
             {
-                TxtConnDiscord.Text = $"Discord: {_loc.Get("send.conn.checking")}";
+                TxtConnDiscord.Text = $"{DiscordLabel}: {_loc.Get("send.conn.checking")}";
                 TxtConnDiscord.Foreground = Brush("#B8A8D0");
             }
 
             BtnRecheckConnection.IsEnabled = false;
             try
             {
-                var result = await _dispatcher.CheckConnectionsAsync(SelectedWebhookUrl());
+                var isTest = IsTestMode;
+                var result = await _dispatcher.CheckConnectionsAsync(
+                    EffectiveWebhookUrl(), EffectiveTelegramChatId(),
+                    checkTelegram: !isTest || HasTelegramTestTarget,
+                    checkDiscord: !isTest || HasDiscordTestTarget);
                 _lastConnResult = result;
                 _connChecked = true;
 
-                SetConnectionLine(TxtConnTelegram, "Telegram", result.Telegram);
-                SetConnectionLine(TxtConnDiscord, "Discord", result.Discord);
+                SetConnectionLine(TxtConnTelegram, TelegramLabel, result.Telegram);
+                SetConnectionLine(TxtConnDiscord, DiscordLabel, result.Discord);
             }
             finally
             {

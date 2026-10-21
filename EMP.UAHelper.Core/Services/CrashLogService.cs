@@ -45,12 +45,31 @@ namespace EMP.UAHelper.Core.Services
             }
         }
 
-        // UA: Базовий запис рядка в лог
-        // EN: Base method to write a line to the log
+        // UA: Спільний для всіх екземплярів замок запису — Telegram і Discord
+        //     відправляються паралельно, і одночасний AppendAllTextAsync в
+        //     один файл кидає IOException (рядок губиться)
+        // EN: A write lock shared by all instances — Telegram and Discord are
+        //     sent in parallel, and a concurrent AppendAllTextAsync to one
+        //     file throws an IOException (the line is lost)
+        private static readonly SemaphoreSlim WriteLock = new(1, 1);
+
+        // UA: Базовий запис рядка в лог (з мілісекундами — для точної
+        //     послідовності HTTP-запитів)
+        // EN: Base method to write a line to the log (with milliseconds — for
+        //     an exact sequence of HTTP requests)
         private async Task WriteAsync(string level, string message)
         {
-            var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{level}] {message}";
-            await File.AppendAllTextAsync(_logPath, line + Environment.NewLine);
+            var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{level}] {message}";
+
+            await WriteLock.WaitAsync();
+            try
+            {
+                await File.AppendAllTextAsync(_logPath, line + Environment.NewLine);
+            }
+            finally
+            {
+                WriteLock.Release();
+            }
         }
     }
 }

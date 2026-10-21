@@ -22,11 +22,11 @@ namespace EMP.UAHelper.WPF
         {
             base.OnStartup(e);
 
-            // UA: Ініціалізуємо сервіс локалізації (UA за замовчуванням)
+            // UA: Ініціалізація сервісу локалізації (UA за замовчуванням)
             // EN: Initialize localization service (UA by default)
             var localizationService = new LocalizationService();
 
-            // UA: Перевіряємо чи існує файл налаштувань
+            // UA: Перевірка, чи існує файл налаштувань
             // EN: Check if settings file exists
             var settingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
             if (!File.Exists(settingsPath))
@@ -34,19 +34,19 @@ namespace EMP.UAHelper.WPF
                 var firstRun = new FirstRunWindow(localizationService);
                 if (firstRun.ShowDialog() != true)
                 {
-                    // UA: Користувач закрив вікно без збереження — виходимо
-                    // EN: User closed window without saving — exit
+                    // UA: Вікно закрито без збереження — вихід
+                    // EN: Window closed without saving — exit
                     Shutdown();
                     return;
                 }
             }
 
-            // UA: Завантажуємо конфігурацію
+            // UA: Завантаження конфігурації
             // EN: Load configuration
             var configService = new ConfigurationService();
             var settings = configService.Settings;
 
-            // UA: Відновлюємо збережену мову інтерфейсу
+            // UA: Відновлення збереженої мови інтерфейсу
             // EN: Restore saved UI language
             if (settings.UiLanguage?.ToLower() == "en")
                 localizationService.SetLanguage(UiLanguage.EN);
@@ -66,7 +66,7 @@ namespace EMP.UAHelper.WPF
 
         protected override void OnExit(ExitEventArgs e)
         {
-            // UA: Прибираємо іконку з трею при виході
+            // UA: Іконка в треї прибирається при виході
             // EN: Remove tray icon on exit
             _trayService?.Dispose();
             base.OnExit(e);

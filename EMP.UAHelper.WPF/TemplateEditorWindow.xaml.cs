@@ -267,7 +267,7 @@ namespace EMP.UAHelper.WPF
                 MessageBoxImage.Information);
         }
 
-        // UA: Відписуємось від події при закритті
+        // UA: Відписка від події при закритті
         // EN: Unsubscribe from event on close
         protected override void OnClosed(EventArgs e)
         {

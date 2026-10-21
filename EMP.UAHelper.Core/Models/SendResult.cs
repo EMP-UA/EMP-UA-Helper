@@ -4,18 +4,14 @@
 // Підтримати / Donate: https://ko-fi.com/emp_ua
 // Ліцензія / License: GPL-3.0
 // =============================================================================
-// UA: Структурований результат відправки сповіщення. Раніше
-//     NotificationDispatcher або мовчки "все вдалось" (await без перевірки),
-//     або кидав виняток, що ховав інформацію про ІНШУ платформу — якщо
-//     Telegram впав, ми не дізнавались, чи Discord встиг відправитись
-//     (і навпаки). Ці типи дають по одному явному результату на кожну
-//     платформу незалежно від того, що сталось з іншою.
-// EN: A structured notification-send result. Previously NotificationDispatcher
-//     either silently assumed success (an un-checked await) or threw, which hid
-//     information about the OTHER platform — if Telegram failed, we never found
-//     out whether Discord had already gone through (and vice versa). These
-//     types give one explicit result per platform, independent of what
-//     happened to the other.
+// UA: Структурований результат відправки сповіщення. Ці типи дають по
+//     одному явному результату на кожну платформу незалежно від того, що
+//     сталось з іншою: збій однієї платформи не ховає, що друга вже
+//     відправила повідомлення (і навпаки).
+// EN: A structured notification-send result. These types give one explicit
+//     result per platform, independent of what happened to the other: a
+//     failure on one platform doesn't hide that the other already sent the
+//     message (and vice versa).
 // =============================================================================
 namespace EMP.UAHelper.Core.Models
 {
@@ -51,6 +47,16 @@ namespace EMP.UAHelper.Core.Models
         public required bool Succeeded { get; init; }
         public string? ConfirmationId { get; init; }
         public Exception? Error { get; init; }
+
+        // UA: Примітка до успішної відправки, якщо платформа отримала
+        //     повідомлення не у звичайному вигляді (напр. Telegram: прев'ю
+        //     посилання недоступне, тож надіслано фото з мініатюрою).
+        //     Показується поруч зі статусом, щоб відмінність було видно.
+        // EN: A note for a successful send when the platform received the
+        //     message in a non-standard form (e.g. Telegram: the link preview
+        //     was unavailable, so a photo with the thumbnail was sent). Shown
+        //     next to the status so the difference is visible.
+        public string? Note { get; init; }
 
         // UA: Короткий, зручний для показу в UI/логах підсумок одного рядка
         // EN: A short, UI/log-friendly one-line summary

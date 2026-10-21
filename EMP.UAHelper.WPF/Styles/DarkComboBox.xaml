@@ -1,13 +1,11 @@
 <!-- Author: EMP_UA | https://github.com/EMP-UA/EMP-UA-Helper -->
 <!-- Donate: https://ko-fi.com/emp_ua -->
-<!-- UA: Спільний темний стиль ComboBox — раніше був продубльований у
-     SendNotificationWindow.xaml і тепер знову знадобився для вибору
-     часової зони у FirstRunWindow та SettingsWindow. Винесено сюди й
-     підключено через App.xaml, щоб не копіювати ще раз.
-     EN: Shared dark ComboBox style — used to be duplicated inside
-     SendNotificationWindow.xaml and is now needed again for the timezone
-     picker in FirstRunWindow and SettingsWindow. Moved here and merged via
-     App.xaml so it isn't copy-pasted again. -->
+<!-- UA: Спільний темний стиль ComboBox — використовується у
+     SendNotificationWindow, FirstRunWindow (вибір часової зони) та
+     SettingsWindow. Підключений через App.xaml, щоб не дублювати.
+     EN: Shared dark ComboBox style — used by SendNotificationWindow,
+     FirstRunWindow (timezone picker) and SettingsWindow. Merged via App.xaml
+     so it isn't duplicated. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 

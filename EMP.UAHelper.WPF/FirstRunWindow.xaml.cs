@@ -31,7 +31,7 @@ namespace EMP.UAHelper.WPF
         {
             InitializeComponent();
 
-            // UA: Встановлюємо чекбокси ПРОГРАМНО, після InitializeComponent —
+            // UA: Чекбокси встановлюються ПРОГРАМНО, після InitializeComponent —
             //     якщо задати IsChecked="True" прямо в XAML, подія Checked
             //     спрацьовує під час побудови дерева елементів, коли пізніші
             //     за розташуванням панелі (PanelYoutube тощо) ще не присвоєні
@@ -47,19 +47,14 @@ namespace EMP.UAHelper.WPF
             ChkUseDiscord.IsChecked = true;
             ChkUseTwitch.IsChecked = true;
 
-            // UA: Заповнюємо список часових зон і одразу підставляємо
-            //     системну зону як початкове значення за замовчуванням —
-            //     нікому не доведеться нічого вирішувати, якщо їх влаштовує
-            //     їхня власна зона. Значення зберігається явно в
-            //     appsettings.json з моменту збереження — і більше не
-            //     змінюється саме собою, навіть якщо системна зона
-            //     комп'ютера пізніше зміниться
+            // UA: Список часових зон заповнюється, системна зона підставляється
+            //     як початкове значення за замовчуванням. Після збереження
+            //     значення лежить явно в appsettings.json і не змінюється
+            //     саме собою, навіть якщо системна зона комп'ютера зміниться
             // EN: Populate the timezone list and pre-select the system's own
-            //     zone as the initial default value — nobody has to decide
-            //     anything if their own zone works for them. The value is
-            //     saved explicitly into appsettings.json from that point on
-            //     — and never changes by itself again, even if the
-            //     machine's system zone changes later
+            //     zone as the initial default value. Once saved, the value
+            //     is stored explicitly in appsettings.json and doesn't change
+            //     by itself, even if the machine's system zone changes
             TimezoneCombo.ItemsSource = AppTimeZone.AllZones();
             TimezoneCombo.SelectedValue = AppTimeZone.DetectSystemId();
 
@@ -116,9 +111,9 @@ namespace EMP.UAHelper.WPF
             => _loc.SetLanguage(UiLanguage.EN);
 
         // UA: Захисні null-перевірки — додаткова страховка, навіть попри те,
-        //     що чекбокси тепер встановлюються після InitializeComponent
+        //     що чекбокси встановлюються після InitializeComponent
         // EN: Defensive null checks — extra safety net, even though the
-        //     checkboxes are now set after InitializeComponent
+        //     checkboxes are set after InitializeComponent
         private void ChkUseTelegram_Changed(object sender, RoutedEventArgs e)
         {
             if (PanelTelegram == null) return;

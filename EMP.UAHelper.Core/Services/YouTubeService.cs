@@ -43,7 +43,7 @@ namespace EMP.UAHelper.Core.Services
         private static HttpClient CreateHttpClient()
         {
             var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("EMP-UA-Helper/1.5.0 (+https://github.com/EMP-UA/EMP-UA-Helper)");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("EMP-UA-Helper/1.5.5 (+https://github.com/EMP-UA/EMP-UA-Helper)");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/atom+xml, application/xml;q=0.9, */*;q=0.8");
             return client;
         }
@@ -58,10 +58,10 @@ namespace EMP.UAHelper.Core.Services
             _channelId = channelId;
         }
 
-        // UA: Автоматичний вибір — той самий пріоритет, що й раніше:
+        // UA: Автоматичний вибір за пріоритетом:
         //     активна трансляція > запланована > останнє звичайне відео/шортс.
         //     Кожен виклик також оновлює локальний кеш кандидатів.
-        // EN: Automatic pick — same priority as before: live stream > upcoming >
+        // EN: Automatic pick by priority: live stream > upcoming >
         //     latest regular video/short. Every call also refreshes the local
         //     candidate cache.
         public async Task<VideoInfo?> GetLatestContentAsync()
@@ -193,8 +193,8 @@ namespace EMP.UAHelper.Core.Services
             }
         }
 
-        // UA: ID плейлиста завантажень беремо з channels.list, а не збираємо
-        //     самотужки підміною "UC"→"UU": підміна працює для більшості
+        // UA: ID плейлиста завантажень береться з channels.list, а не будується
+        //     підміною "UC"→"UU": підміна працює для більшості
         //     каналів, але це недокументована домовленість, а не гарантія, і
         //     коштує запит рівно 1 юніт — не та економія, заради якої варто
         //     покладатись на здогад про формат ID
@@ -282,7 +282,7 @@ namespace EMP.UAHelper.Core.Services
             XNamespace yt = "http://www.youtube.com/xml/schemas/2015";
 
             // UA: YouTube сам обмежує цей фід ~15 записами незалежно від Take() —
-            //     запитуємо з невеликим запасом, щоб точно нічого не відкинути
+            //     запитується з невеликим запасом, щоб точно нічого не відкинути
             // EN: YouTube itself caps this feed at ~15 entries regardless of
             //     Take() — request slightly more just to be safe
             return doc.Descendants(ns + "entry")
@@ -292,20 +292,20 @@ namespace EMP.UAHelper.Core.Services
                 .ToList();
         }
 
-        // UA: Кілька спроб отримати RSS. Повторюємо лише те, що має шанс
-        //     минутись саме себе: 5xx (проблема на боці YouTube), 429 (нас
-        //     тимчасово пригальмували) і мережеві збої/таймаути. 4xx на кшталт
-        //     404 не повторюємо — це означає неправильний ChannelId у
+        // UA: Кілька спроб отримати RSS. Повторюється лише те, що має шанс
+        //     минутись саме: 5xx (проблема на боці YouTube), 429 (запити
+        //     тимчасово обмежені) і мережеві збої/таймаути. 4xx на кшталт
+        //     404 не повторюється — це означає неправильний ChannelId у
         //     налаштуваннях, і десять однакових запитів його не виправлять.
         //     Пауза між спробами зростає (0.5с, 1с) — щоб не бити по сервісу,
         //     який і так відповідає помилкою.
         // EN: A few attempts to fetch the RSS. Only retry what has a chance of
-        //     resolving on its own: 5xx (a problem on YouTube's side), 429 (we
-        //     got throttled) and network failures/timeouts. 4xx such as 404 is
+        //     resolving on its own: 5xx (a problem on YouTube's side), 429 (requests
+        //     are throttled) and network failures/timeouts. 4xx such as 404 is
         //     not retried — that means a wrong ChannelId in the settings, and
         //     ten identical requests won't fix it. The pause between attempts
-        //     grows (0.5s, 1s) so we don't hammer a service that's already
-        //     answering with an error.
+        //     grows (0.5s, 1s) so a service that is already answering with an
+        //     error isn't hammered.
         private async Task<string> GetRssWithRetryAsync()
         {
             const int maxAttempts = 3;
@@ -357,7 +357,7 @@ namespace EMP.UAHelper.Core.Services
             foreach (var item in response.Items)
             {
                 // UA: Ці два поля спільні для будь-якого типу контенту —
-                //     обчислюємо один раз, а не в кожній гілці нижче
+                //     обчислюються один раз, а не в кожній гілці нижче
                 // EN: These two fields are common to any content type —
                 //     compute once instead of per-branch below
                 var publishedAt = item.Snippet.PublishedAtDateTimeOffset;

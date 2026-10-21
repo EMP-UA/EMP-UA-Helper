@@ -113,6 +113,16 @@
             </Style.Triggers>
         </Style>
 
+        <!-- UA: Звичайний перемикач-опція всередині секції платформи
+             EN: A regular option toggle inside a platform section -->
+        <Style x:Key="OptionCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#E8E0F0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,14,0,0"/>
+        </Style>
+
         <Style x:Key="SectionCheckBox" TargetType="CheckBox">
             <Setter Property="Foreground" Value="#B8A8D0"/>
             <Setter Property="FontSize" Value="13"/>
@@ -157,6 +167,13 @@
             <TextBlock x:Name="TxtTimezoneHint" Style="{StaticResource FieldHint}" Margin="0,8,0,3"/>
             <ComboBox x:Name="TimezoneCombo" Style="{StaticResource ComboField}"
                       DisplayMemberPath="DisplayName" SelectedValuePath="Id"/>
+
+            <!-- UA: Коли показувати окреме вікно з результатом відправки
+                 EN: When to show a separate send-result window -->
+            <TextBlock x:Name="TxtResultDialogLabel" Style="{StaticResource SectionLabel}" Margin="0,20,0,0"/>
+            <Rectangle Height="1" Fill="#3D2B5E" Margin="0,4,0,0"/>
+            <TextBlock x:Name="TxtResultDialogHint" Style="{StaticResource FieldHint}" Margin="0,8,0,3"/>
+            <ComboBox x:Name="ResultDialogCombo" Style="{StaticResource ComboField}"/>
 
             <!-- UA: Група — ДЖЕРЕЛА КОНТЕНТУ / EN: Group — CONTENT SOURCES -->
             <TextBlock x:Name="TxtGroupContent" Style="{StaticResource GroupLabel}"/>
@@ -245,6 +262,30 @@
                 <TextBlock x:Name="TxtTgChannel" Style="{StaticResource FieldLabel}"/>
                 <TextBlock x:Name="TxtTgChannelHint" Style="{StaticResource FieldHint}"/>
                 <TextBox x:Name="TelegramChannel" Style="{StaticResource InputField}"/>
+
+                <!-- UA: Тестовий чат — числовий ID особистого чату з ботом.
+                         Кнопка шукає його серед повідомлень, надісланих боту
+                         (спершу потрібно написати боту /start)
+                     EN: Test chat — the numeric ID of the private chat with
+                         the bot. The button looks it up among messages sent
+                         to the bot (write /start to the bot first) -->
+                <TextBlock x:Name="TxtTgTestChat" Style="{StaticResource FieldLabel}"/>
+                <TextBlock x:Name="TxtTgTestChatHint" Style="{StaticResource FieldHint}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TelegramTestChatId" Grid.Column="0" Style="{StaticResource InputField}"/>
+                    <Button x:Name="BtnFindTestChat" Grid.Column="1" Style="{StaticResource RevealButton}"
+                            Width="Auto" Padding="12,0" Margin="6,0,0,0"
+                            Click="BtnFindTestChat_Click"/>
+                </Grid>
+
+                <!-- UA: Мініатюра YouTube як фото замість прев'ю посилання
+                     EN: YouTube thumbnail as a photo instead of a link preview -->
+                <CheckBox x:Name="ChkThumbnailAsPhoto" Style="{StaticResource OptionCheckBox}"/>
+                <TextBlock x:Name="TxtThumbnailAsPhotoHint" Style="{StaticResource FieldHint}"/>
             </StackPanel>
 
             <!-- DISCORD -->
@@ -290,6 +331,23 @@
                 <TextBlock x:Name="TxtDcRoleIdHint" Style="{StaticResource FieldHint}"/>
                 <TextBox x:Name="DiscordRoleId" Style="{StaticResource InputField}"/>
 
+                <!-- UA: Вебхук тестового каналу — замаскований, як і решта URL
+                         вебхуків (URL дає повний доступ до відправки в канал)
+                     EN: Test channel webhook — masked like every other webhook
+                         URL (the URL grants full access to post into the channel) -->
+                <TextBlock x:Name="TxtDcTestWebhook" Style="{StaticResource FieldLabel}"/>
+                <TextBlock x:Name="TxtDcTestWebhookHint" Style="{StaticResource FieldHint}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <PasswordBox x:Name="DiscordTestWebhookSecure" Grid.Column="0" Style="{StaticResource SecureInputField}"/>
+                    <TextBox x:Name="DiscordTestWebhookPlain" Grid.Column="0" Style="{StaticResource InputField}" Visibility="Collapsed"/>
+                    <Button x:Name="BtnToggleDiscordTestWebhook" Grid.Column="1" Content="👁" Style="{StaticResource RevealButton}"
+                            Click="ToggleDiscordTestWebhook_Click"/>
+                </Grid>
+
                 <!-- UA: Додаткові канали. Рядки будуються з коду, а не описані
                          тут статично, бо їх кількість довільна. Порожній список
                          за замовчуванням: хто має один канал — навіть не
@@ -304,13 +362,11 @@
                 <TextBlock x:Name="TxtDcExtraChannelsHint" Style="{StaticResource FieldHint}"/>
 
                 <!-- UA: Заголовок-підпис над рядками — без нього незрозуміло,
-                         яке поле це назва каналу, а яке його URL (баг з
-                         реального тестування v1.3.0). Колонки мають ті самі
+                         яке поле це назва каналу, а яке його URL. Колонки мають ті самі
                          ширини, що й у рядках, які будує AddChannelRow().
                      EN: A header label above the rows — without it it's
                          unclear which field is the channel name and which is
-                         its URL (a bug found during real-world v1.3.0
-                         testing). Columns match the widths AddChannelRow()
+                         its URL. Columns match the widths AddChannelRow()
                          builds each row with. -->
                 <Grid Margin="0,4,0,3">
                     <Grid.ColumnDefinitions>
