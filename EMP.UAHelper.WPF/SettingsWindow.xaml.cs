@@ -40,7 +40,13 @@ namespace EMP.UAHelper.WPF
 
             ApplyLocalization();
             LoadCurrentSettings(current);
+            TextBoxClipboard.AttachAll(this, _loc, null, ClipboardLog);
         }
+
+        // UA: Збої буфера обміну пишуться в лог
+        // EN: Clipboard failures are written to the log
+        private static void ClipboardLog(string message) =>
+            _ = new CrashLogService().LogWarningAsync(message);
 
         // UA: Поля та чекбокси попередньо заповнюються поточними значеннями.
         //     Секретні поля завжди відкриваються замасковані — незалежно від
@@ -65,6 +71,7 @@ namespace EMP.UAHelper.WPF
 
             BuildResultDialogOptions();
             ResultDialogCombo.SelectedIndex = Array.IndexOf(ResultDialogModes, SendResultDialogMode.Normalize(s.SendResultDialog));
+            ChkOpenSendOnStartup.IsChecked = s.OpenSendWindowOnStartup;
 
             ChkUseTelegram.IsChecked = s.UseTelegram;
             ChkUseYoutube.IsChecked = s.UseYouTube;
@@ -116,6 +123,7 @@ namespace EMP.UAHelper.WPF
             TxtTimezoneHint.Text = _loc.Get("settings.timezone.hint");
             TxtResultDialogLabel.Text = _loc.Get("settings.result_dialog.label");
             TxtResultDialogHint.Text = _loc.Get("settings.result_dialog.hint");
+            ChkOpenSendOnStartup.Content = _loc.Get("settings.open_send_on_startup");
             BuildResultDialogOptions();
             TxtGroupContent.Text = _loc.Get("settings.group.content");
             TxtGroupNotify.Text = _loc.Get("settings.group.notify");
@@ -388,6 +396,7 @@ namespace EMP.UAHelper.WPF
                 SendResultDialog = ResultDialogCombo.SelectedIndex >= 0
                     ? ResultDialogModes[ResultDialogCombo.SelectedIndex]
                     : SendResultDialogMode.Failures,
+                OpenSendWindowOnStartup = ChkOpenSendOnStartup.IsChecked == true,
                 DiscordTestWebhookUrl = testWebhook,
                 DiscordRoleId = DiscordRoleId.Text.Trim(),
                 ChannelId = YoutubeChannelId.Text.Trim(),
@@ -444,6 +453,7 @@ namespace EMP.UAHelper.WPF
                 Tag = "name"
             };
             Grid.SetColumn(nameBox, 0);
+            TextBoxClipboard.Attach(nameBox, _loc, null, ClipboardLog);
 
             // UA: URL цього каналу — та сама пара PasswordBox/TextBox з
             //     кнопкою 👁, що й у основного вебхука, тільки своя на кожен
@@ -469,6 +479,7 @@ namespace EMP.UAHelper.WPF
                 Visibility = Visibility.Collapsed
             };
             Grid.SetColumn(urlPlain, 1);
+            TextBoxClipboard.Attach(urlPlain, _loc, null, ClipboardLog);
 
             var toggleButton = new Button
             {
@@ -563,6 +574,7 @@ namespace EMP.UAHelper.WPF
                 Tag = "name"
             };
             Grid.SetColumn(nameBox, 0);
+            TextBoxClipboard.Attach(nameBox, _loc, null, ClipboardLog);
 
             var idBox = new TextBox
             {
@@ -572,6 +584,7 @@ namespace EMP.UAHelper.WPF
                 Tag = "id"
             };
             Grid.SetColumn(idBox, 1);
+            TextBoxClipboard.Attach(idBox, _loc, null, ClipboardLog);
 
             var removeButton = new Button
             {

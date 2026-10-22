@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-blue)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
 ![License](https://img.shields.io/badge/License-GPL%20v3-green)
-![Version](https://img.shields.io/badge/Version-1.5.5-8A46C1)
+![Version](https://img.shields.io/badge/Version-1.5.6-8A46C1)
 
 **UA:** Десктопний інструмент для одночасного надсилання сповіщень про трансляції та відео у Telegram і Discord одним кліком. Кожна платформа — джерело контенту (YouTube, Twitch) чи платформа сповіщень (Telegram, Discord) — вмикається і вимикається незалежно, будь-коли, без перезапуску програми.
 **EN:** A desktop tool for sending simultaneous stream and video notifications to Telegram and Discord in one click. Every platform — a content source (YouTube, Twitch) or a notification platform (Telegram, Discord) — can be toggled independently, anytime, without restarting the app.
@@ -23,6 +23,7 @@
 - **UA:** У ручному режимі — прикріплення до 10 зображень (скріншотів, фото) до однієї публікації, спільних для Telegram і Discord; порядок можна змінити (кнопки ◀/▶ або перетягування мишею), а по кліку на мініатюру відкривається перегляд у повний розмір / **EN:** In manual mode — attach up to 10 images (screenshots, photos) to a single post, shared between Telegram and Discord; the order can be changed (◀/▶ buttons or mouse drag), and clicking a thumbnail opens a full-size preview
 - **UA:** Вікно "📡 Надіслати сповіщення" перевіряє з'єднання з увімкненими платформами ще до натискання "Надіслати" (автоматично під час відкриття й повторно за кнопкою 🔄) — лише read-only запити, нічого не публікується і не видно підписникам / **EN:** The "📡 Send Notification" window checks connectivity with the enabled platforms before "Send" is pressed (automatically on open, and again via the 🔄 button) — read-only requests only, nothing is posted or visible to subscribers
 - **UA:** Реальний статус відправки окремо для Telegram і Discord — Discord-вебхук явно підтверджує доставку (`?wait=true`), а не вважається успішним мовчки / **EN:** A real send status for Telegram and Discord separately — the Discord webhook explicitly confirms delivery (`?wait=true`) rather than being silently assumed successful
+- **UA:** 📡 Опційно — вікно відправки відкривається одразу при запуску програми ("⚙️ Налаштування" → Загальне) / **EN:** Optional — the send window opens right when the app starts ("⚙️ Settings" → General)
 - **UA:** 🧪 Тестова відправка — Telegram в особистий чат з ботом, Discord у вебхук окремого тестового каналу; підписники основних каналів тесту не бачать / **EN:** 🧪 Test send — Telegram to the private chat with the bot, Discord to a separate test channel's webhook; subscribers of the main channels never see the test
 - **UA:** Окреме вікно з результатом відправки по кожній платформі — завжди, лише при помилці або ніколи (⚙️ Налаштування → Загальне) / **EN:** A separate send-result window with the result per platform — always, only on failure, or never (⚙️ Settings → General)
 - **UA:** Захист від дублікатів — повторне натискання "Надіслати" для того самого вмісту не повторює відправку на платформу, яка вже підтвердила успіх, без окремого підтвердження користувача / **EN:** Duplicate-send protection — pressing "Send" again for the same content won't resend to a platform that already confirmed success, without the user's separate confirmation
@@ -221,8 +222,8 @@ A platform without a test target isn't sent to at all in test mode — there's n
 
 ## 📝 Історія версій / Changelog
 
-**UA:** Повна історія версій — у [CHANGELOG.md](CHANGELOG.md). Останній реліз: **v1.5.5**.
-**EN:** Full version history is in [CHANGELOG.md](CHANGELOG.md). Latest release: **v1.5.5**.
+**UA:** Повна історія версій — у [CHANGELOG.md](CHANGELOG.md). Останній реліз: **v1.5.6**.
+**EN:** Full version history is in [CHANGELOG.md](CHANGELOG.md). Latest release: **v1.5.6**.
 
 ---
 

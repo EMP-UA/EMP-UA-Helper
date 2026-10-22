@@ -340,14 +340,26 @@
             <!-- UA: Приклад для Telegram — окремий блок
                  EN: Telegram preview — separate block -->
             <StackPanel x:Name="PanelPreviewTelegram" Visibility="Collapsed">
-                <TextBlock x:Name="TxtPreviewTelegramLabel" Style="{StaticResource PlatformPreviewLabel}"/>
+                <DockPanel>
+                    <Button x:Name="BtnCopyPreviewTelegram" DockPanel.Dock="Right" Content="📋"
+                            Style="{StaticResource LangButton}" Margin="6,6,0,0"
+                            Click="BtnCopyPreviewTelegram_Click"/>
+                    <TextBlock x:Name="TxtPreviewTelegramLabel" Style="{StaticResource PlatformPreviewLabel}"
+                               VerticalAlignment="Bottom"/>
+                </DockPanel>
                 <TextBox x:Name="PreviewTelegramBox" Style="{StaticResource PreviewBox}"/>
             </StackPanel>
 
             <!-- UA: Приклад для Discord — окремий блок
                  EN: Discord preview — separate block -->
             <StackPanel x:Name="PanelPreviewDiscord" Visibility="Collapsed">
-                <TextBlock x:Name="TxtPreviewDiscordLabel" Style="{StaticResource PlatformPreviewLabel}"/>
+                <DockPanel>
+                    <Button x:Name="BtnCopyPreviewDiscord" DockPanel.Dock="Right" Content="📋"
+                            Style="{StaticResource LangButton}" Margin="6,6,0,0"
+                            Click="BtnCopyPreviewDiscord_Click"/>
+                    <TextBlock x:Name="TxtPreviewDiscordLabel" Style="{StaticResource PlatformPreviewLabel}"
+                               VerticalAlignment="Bottom"/>
+                </DockPanel>
                 <TextBox x:Name="PreviewDiscordBox" Style="{StaticResource PreviewBox}"/>
             </StackPanel>
 

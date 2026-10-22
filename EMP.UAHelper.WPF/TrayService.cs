@@ -108,7 +108,9 @@ namespace EMP.UAHelper.WPF
             editor.Show();
         }
 
-        private void OpenSendNotification()
+        // UA: Відкриває вікно відправки (з меню трею і, за налаштуванням, при запуску)
+        // EN: Opens the send window (from the tray menu and, per the setting, on startup)
+        public void OpenSendNotification()
         {
             var window = new SendNotificationWindow(_youTubeService, _dispatcher, _templateService, _settings, _loc);
             window.Show();

@@ -43,7 +43,7 @@ namespace EMP.UAHelper.Core.Services
         private static HttpClient CreateHttpClient()
         {
             var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("EMP-UA-Helper/1.5.5 (+https://github.com/EMP-UA/EMP-UA-Helper)");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("EMP-UA-Helper/1.5.6 (+https://github.com/EMP-UA/EMP-UA-Helper)");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/atom+xml, application/xml;q=0.9, */*;q=0.8");
             return client;
         }

@@ -142,6 +142,12 @@ namespace EMP.UAHelper.Core.Services
         //     window. An empty, missing or unknown value
         //     is treated as "failures".
         public string SendResultDialog { get; set; } = SendResultDialogMode.Failures;
+
+        // UA: Чи відкривати вікно "📡 Надіслати сповіщення" одразу при запуску
+        //     програми (типово — ні, лише іконка в треї)
+        // EN: Whether to open the "📡 Send Notification" window right when
+        //     the app starts (off by default — the tray icon only)
+        public bool OpenSendWindowOnStartup { get; set; }
     }
 
     // UA: Іменований Discord-канал. Окремий клас, а не пара рядків, бо

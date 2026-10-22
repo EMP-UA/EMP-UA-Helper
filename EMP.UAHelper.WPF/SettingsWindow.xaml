@@ -175,6 +175,10 @@
             <TextBlock x:Name="TxtResultDialogHint" Style="{StaticResource FieldHint}" Margin="0,8,0,3"/>
             <ComboBox x:Name="ResultDialogCombo" Style="{StaticResource ComboField}"/>
 
+            <!-- UA: Відкривати вікно відправки при запуску програми
+                 EN: Open the send window when the app starts -->
+            <CheckBox x:Name="ChkOpenSendOnStartup" Style="{StaticResource OptionCheckBox}" Margin="0,20,0,0"/>
+
             <!-- UA: Група — ДЖЕРЕЛА КОНТЕНТУ / EN: Group — CONTENT SOURCES -->
             <TextBlock x:Name="TxtGroupContent" Style="{StaticResource GroupLabel}"/>
 

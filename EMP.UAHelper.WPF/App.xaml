@@ -11,6 +11,7 @@
                      EN: Shared styles available from any window without duplication -->
                 <ResourceDictionary Source="Styles/DarkComboBox.xaml"/>
                 <ResourceDictionary Source="Styles/DarkCalendar.xaml"/>
+                <ResourceDictionary Source="Styles/DarkContextMenu.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

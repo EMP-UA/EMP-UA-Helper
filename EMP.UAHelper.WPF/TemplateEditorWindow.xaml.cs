@@ -56,6 +56,7 @@ namespace EMP.UAHelper.WPF
             ApplyLocalization();
             LoadTemplates();
             WireCounters();
+            TextBoxClipboard.AttachAll(this, _loc, null, message => _ = new CrashLogService().LogWarningAsync(message));
         }
 
         // UA: Будується щоразу (а не кешується в полі), бо лейбли залежать від

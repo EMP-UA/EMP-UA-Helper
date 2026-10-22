@@ -195,6 +195,19 @@ namespace EMP.UAHelper.WPF
             ApplyTextFilter(RawTelegramInput);
             ApplyTextFilter(RawDiscordInput);
 
+            // UA: Копіювання/вставка для всіх текстових полів вікна, включно з
+            //     полями прикладу в шаблонному режимі; поля з фільтром
+            //     нормалізують і вставлений текст
+            // EN: Copy/paste for all text fields of the window, including the
+            //     preview fields in template mode; filtered fields normalize
+            //     the pasted text too
+            TextBoxClipboard.AttachAll(
+                this, _loc,
+                box => ReferenceEquals(box, TitleInput) || ReferenceEquals(box, RawTelegramInput) || ReferenceEquals(box, RawDiscordInput)
+                    ? FilterText
+                    : null,
+                ClipboardLog);
+
             if (_youTubeService != null)
             {
                 ChkAutoLatest.Visibility = Visibility.Visible;
@@ -293,6 +306,8 @@ namespace EMP.UAHelper.WPF
             TxtRawMentionSnippetLabel.Text = _loc.Get("send.raw.mention.snippet");
             ItemMentionRole.Content = _loc.Get("send.raw.mention.role");
             ItemMentionUser.Content = _loc.Get("send.raw.mention.user");
+            BtnCopyPreviewTelegram.ToolTip = _loc.Get("send.preview.copy");
+            BtnCopyPreviewDiscord.ToolTip = _loc.Get("send.preview.copy");
             ItemMentionChannel.Content = _loc.Get("send.raw.mention.channel");
 
             TxtRawAttachLabel.Text = _loc.Get("send.raw.attach.label");
@@ -391,14 +406,33 @@ namespace EMP.UAHelper.WPF
         private void BtnCopyTelegramSnippet_Click(object sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(RawTelegramSnippetBox.Text))
-                System.Windows.Clipboard.SetText(RawTelegramSnippetBox.Text);
+                TextBoxClipboard.TrySetText(RawTelegramSnippetBox.Text, ClipboardLog);
         }
 
         private void BtnCopyDiscordSnippet_Click(object sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(RawDiscordSnippetBox.Text))
-                System.Windows.Clipboard.SetText(RawDiscordSnippetBox.Text);
+                TextBoxClipboard.TrySetText(RawDiscordSnippetBox.Text, ClipboardLog);
         }
+
+        // UA: Копіює приклад повідомлення для платформи в буфер обміну
+        // EN: Copies the platform's message preview to the clipboard
+        private void BtnCopyPreviewTelegram_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(PreviewTelegramBox.Text))
+                TextBoxClipboard.TrySetText(PreviewTelegramBox.Text, ClipboardLog);
+        }
+
+        private void BtnCopyPreviewDiscord_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(PreviewDiscordBox.Text))
+                TextBoxClipboard.TrySetText(PreviewDiscordBox.Text, ClipboardLog);
+        }
+
+        // UA: Збої буфера обміну пишуться в лог
+        // EN: Clipboard failures are written to the log
+        private static void ClipboardLog(string message) =>
+            _ = new CrashLogService().LogWarningAsync(message);
 
         // =====================================================================
         // UA: Генератор тегу згадки — той самий принцип, що й у позначок часу
@@ -471,7 +505,7 @@ namespace EMP.UAHelper.WPF
         private void BtnCopyMentionSnippet_Click(object sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(RawMentionSnippetBox.Text))
-                System.Windows.Clipboard.SetText(RawMentionSnippetBox.Text);
+                TextBoxClipboard.TrySetText(RawMentionSnippetBox.Text, ClipboardLog);
         }
 
         // =====================================================================

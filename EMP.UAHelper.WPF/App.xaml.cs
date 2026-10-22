@@ -62,6 +62,11 @@ namespace EMP.UAHelper.WPF
 
             _trayService = new TrayService(settings, templateService, crashLogService, localizationService);
             _trayService.Initialize();
+
+            // UA: За налаштуванням одразу відкривається вікно відправки
+            // EN: Per the setting, the send window opens right away
+            if (settings.OpenSendWindowOnStartup)
+                _trayService.OpenSendNotification();
         }
 
         protected override void OnExit(ExitEventArgs e)

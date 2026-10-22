@@ -61,6 +61,7 @@ namespace EMP.UAHelper.WPF
             _loc = loc;
             _loc.LanguageChanged += ApplyLocalization;
             ApplyLocalization();
+            TextBoxClipboard.AttachAll(this, _loc, null, message => _ = new CrashLogService().LogWarningAsync(message));
         }
 
         private void ApplyLocalization()
