@@ -227,6 +227,18 @@ A platform without a test target isn't sent to at all in test mode — there's n
 
 ---
 
+## 🤖 Використання ШІ / AI usage
+
+**UA:**
+
+- **Код:** пишеться за допомогою ШІ-асистента (Claude: Sonnet, Opus, Fable) за моїм проєктуванням і тестуванням.
+
+**EN:**
+
+- **Code:** written with AI assistance (Claude: Sonnet, Opus, Fable) under my design and testing.
+
+---
+
 ## 💜 Підтримка / Support the Project
 
 **UA:** Якщо цей інструмент виявився корисним — підтримати можна тут:
